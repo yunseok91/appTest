@@ -249,7 +249,7 @@
                   "id": "TjeBO",
                   "name": "s4step",
                   "fill": "$--primary",
-                  "content": "2 / 3 단계",
+                  "content": "1 / 3 단계",
                   "fontFamily": "Outfit",
                   "fontSize": 12,
                   "fontWeight": "600"
@@ -545,7 +545,7 @@
                   "id": "5aFgp",
                   "name": "s5step",
                   "fill": "$--primary",
-                  "content": "3 / 3 단계",
+                  "content": "2 / 3 단계",
                   "fontFamily": "Outfit",
                   "fontSize": 12,
                   "fontWeight": "600"
@@ -600,14 +600,18 @@
                   "alignItems": "center",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "RpDgg",
-                      "name": "avt",
-                      "fill": "$--foreground",
-                      "content": "👨",
-                      "fontFamily": "Inter",
-                      "fontSize": 40,
-                      "fontWeight": "normal"
+                      "type": "frame",
+                      "id": "ViEWP",
+                      "name": "av_img",
+                      "width": 56,
+                      "height": 56,
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "./images/aRbFP.png",
+                        "mode": "fit"
+                      },
+                      "cornerRadius": 28
                     }
                   ]
                 },
@@ -874,6 +878,16 @@
               "layout": "vertical",
               "gap": 8,
               "children": [
+                {
+                  "type": "text",
+                  "id": "SWgxB",
+                  "name": "s5step",
+                  "fill": "$--primary",
+                  "content": "3 / 3 단계",
+                  "fontFamily": "Outfit",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                },
                 {
                   "type": "text",
                   "id": "uD5AM",
@@ -1374,19 +1388,24 @@
                   "name": "av1",
                   "width": 40,
                   "height": 40,
-                  "fill": "#C8F0D8",
+                  "fill": "#f2d9e1",
                   "cornerRadius": 20,
                   "justifyContent": "center",
                   "alignItems": "center",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "7v8DO",
-                      "name": "av1_t",
-                      "content": "👩",
-                      "fontFamily": "Inter",
-                      "fontSize": 18,
-                      "fontWeight": "normal"
+                      "type": "frame",
+                      "id": "rrox8",
+                      "name": "av1_img",
+                      "width": 30,
+                      "height": 30,
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "./images/HMHJX.png",
+                        "mode": "fit"
+                      },
+                      "cornerRadius": 15
                     }
                   ]
                 },
@@ -1406,19 +1425,24 @@
                   "name": "av2",
                   "width": 40,
                   "height": 40,
-                  "fill": "#E8F5EC",
+                  "fill": "#cbdfee",
                   "cornerRadius": 20,
                   "justifyContent": "center",
                   "alignItems": "center",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "b0Niz",
-                      "name": "av2_t",
-                      "content": "👨",
-                      "fontFamily": "Inter",
-                      "fontSize": 18,
-                      "fontWeight": "normal"
+                      "type": "frame",
+                      "id": "Y5d15",
+                      "name": "av2_img",
+                      "width": 30,
+                      "height": 30,
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "./images/aRbFP.png",
+                        "mode": "fit"
+                      },
+                      "cornerRadius": 15
                     }
                   ]
                 }
@@ -1897,15 +1921,60 @@
                   "fontWeight": "normal"
                 },
                 {
-                  "type": "text",
-                  "id": "fnl1g",
-                  "name": "bal_amt",
-                  "fill": "$--foreground",
-                  "content": "₩1,285,000",
-                  "fontFamily": "Outfit",
-                  "fontSize": 36,
-                  "fontWeight": "700",
-                  "letterSpacing": -1
+                  "type": "frame",
+                  "id": "rkZis",
+                  "name": "bal_amt_row",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "0MY4N",
+                      "name": "bal_amt_copy",
+                      "fill": "#1A1918",
+                      "content": "₩1,285,000",
+                      "fontFamily": "Outfit",
+                      "fontSize": 32,
+                      "fontWeight": "700",
+                      "letterSpacing": -1
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Lv9HF",
+                      "name": "over_bubble",
+                      "fill": "#FEE2E2",
+                      "cornerRadius": 100,
+                      "gap": 4,
+                      "padding": [
+                        5,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "UHTvk",
+                          "name": "bubbleIc",
+                          "width": 12,
+                          "height": 12,
+                          "iconFontName": "triangle-alert",
+                          "iconFontFamily": "lucide",
+                          "fill": "#E05C5C"
+                        },
+                        {
+                          "type": "text",
+                          "id": "gTJjb",
+                          "name": "bubbleTxt",
+                          "fill": "#E05C5C",
+                          "content": "이번 달 초과했는데요?",
+                          "fontFamily": "Outfit",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "type": "frame",
@@ -2174,6 +2243,143 @@
                           "fontWeight": "500"
                         }
                       ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "aNNi4",
+                  "name": "pay_method_row",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "1BhKP",
+                      "name": "cash_btn",
+                      "fill": "$--inactive",
+                      "cornerRadius": 100,
+                      "gap": 5,
+                      "padding": [
+                        8,
+                        16
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "u1m7I",
+                          "name": "cashIc",
+                          "width": 14,
+                          "height": 14,
+                          "iconFontName": "banknote",
+                          "iconFontFamily": "lucide",
+                          "fill": "#FFFFFF"
+                        },
+                        {
+                          "type": "text",
+                          "id": "iiudP",
+                          "name": "cashTxt",
+                          "fill": "#FFFFFF",
+                          "content": "현금",
+                          "fontFamily": "Outfit",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "sqHyz",
+                      "name": "card_btn",
+                      "fill": "$--primary",
+                      "cornerRadius": 100,
+                      "stroke": {
+                        "align": "inside",
+                        "thickness": 1
+                      },
+                      "gap": 5,
+                      "padding": [
+                        8,
+                        16
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "7a0Sd",
+                          "name": "cardIc",
+                          "width": 14,
+                          "height": 14,
+                          "iconFontName": "credit-card",
+                          "iconFontFamily": "lucide",
+                          "fill": "#ffffff"
+                        },
+                        {
+                          "type": "text",
+                          "id": "NsZnz",
+                          "name": "cardTxt",
+                          "fill": "#ffffff",
+                          "content": "카드",
+                          "fontFamily": "Outfit",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "7qVXC",
+                  "name": "card_selector",
+                  "width": "fill_container",
+                  "fill": "#F5F4F1",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "#E5E4E1"
+                  },
+                  "gap": 8,
+                  "padding": [
+                    12,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "jUfq7",
+                      "name": "cardSelIc",
+                      "width": 15,
+                      "height": 15,
+                      "iconFontName": "credit-card",
+                      "iconFontFamily": "lucide",
+                      "fill": "#3D8A5A"
+                    },
+                    {
+                      "type": "text",
+                      "id": "PgJZF",
+                      "name": "cardSelTxt",
+                      "fill": "#1A1918",
+                      "content": "신한카드 ****1234",
+                      "fontFamily": "Outfit",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "JWyCH",
+                      "name": "cardSelChev",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "chevron-down",
+                      "iconFontFamily": "lucide",
+                      "fill": "#9C9B99"
                     }
                   ]
                 },
@@ -3023,14 +3229,31 @@
                           "fontWeight": "500"
                         },
                         {
-                          "type": "text",
-                          "id": "wSrLB",
-                          "name": "s2txa_c",
-                          "fill": "#000000",
-                          "content": "식비 · 민지 · 아침",
-                          "fontFamily": "Outfit",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
+                          "type": "frame",
+                          "id": "NpIJf",
+                          "name": "s2txa_sub",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "RQvfx",
+                              "name": "a1",
+                              "fill": "#000000",
+                              "content": "아침 · 식비 · ",
+                              "fontFamily": "Outfit",
+                              "fontSize": 12
+                            },
+                            {
+                              "type": "text",
+                              "id": "ocFfQ",
+                              "name": "a2",
+                              "fill": "#E05C5C",
+                              "content": "민지",
+                              "fontFamily": "Outfit",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
                         }
                       ]
                     },
@@ -3072,7 +3295,7 @@
                       "name": "s2txb_ic",
                       "width": 40,
                       "height": 40,
-                      "fill": "#FFFFFF",
+                      "fill": "#EBF4FF",
                       "cornerRadius": 12,
                       "justifyContent": "center",
                       "alignItems": "center",
@@ -3085,7 +3308,7 @@
                           "height": 18,
                           "iconFontName": "bus",
                           "iconFontFamily": "lucide",
-                          "fill": "#FFFFFF"
+                          "fill": "#4A90D9"
                         }
                       ]
                     },
@@ -3108,14 +3331,31 @@
                           "fontWeight": "500"
                         },
                         {
-                          "type": "text",
-                          "id": "ys8BB",
-                          "name": "s2txb_c",
-                          "fill": "#000000",
-                          "content": "교통 · 준호 · 점심",
-                          "fontFamily": "Outfit",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
+                          "type": "frame",
+                          "id": "reO2N",
+                          "name": "s2txb_sub",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "3kVqI",
+                              "name": "b1",
+                              "fill": "#000000",
+                              "content": "점심 · 교통 · ",
+                              "fontFamily": "Outfit",
+                              "fontSize": 12
+                            },
+                            {
+                              "type": "text",
+                              "id": "2Xkjh",
+                              "name": "b2",
+                              "fill": "#4A90D9",
+                              "content": "준호",
+                              "fontFamily": "Outfit",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
                         }
                       ]
                     },
@@ -3203,14 +3443,31 @@
                           "fontWeight": "500"
                         },
                         {
-                          "type": "text",
-                          "id": "PJ1c0",
-                          "name": "s2txc_c",
-                          "fill": "#000000",
-                          "content": "수입 · 준호 · 아침",
-                          "fontFamily": "Outfit",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
+                          "type": "frame",
+                          "id": "rMand",
+                          "name": "s2txc_sub",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "86fE3",
+                              "name": "c1",
+                              "fill": "#000000",
+                              "content": "아침 · 수입 · ",
+                              "fontFamily": "Outfit",
+                              "fontSize": 12
+                            },
+                            {
+                              "type": "text",
+                              "id": "SHRW6",
+                              "name": "c2",
+                              "fill": "#4A90D9",
+                              "content": "준호",
+                              "fontFamily": "Outfit",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
                         }
                       ]
                     },
@@ -3252,7 +3509,7 @@
                       "name": "s2txd_ic",
                       "width": 40,
                       "height": 40,
-                      "fill": "#FFFFFF",
+                      "fill": "#F5EDFF",
                       "cornerRadius": 12,
                       "justifyContent": "center",
                       "alignItems": "center",
@@ -3265,7 +3522,7 @@
                           "height": 18,
                           "iconFontName": "film",
                           "iconFontFamily": "lucide",
-                          "fill": "#FFFFFF"
+                          "fill": "#C45FAA"
                         }
                       ]
                     },
@@ -3288,14 +3545,31 @@
                           "fontWeight": "500"
                         },
                         {
-                          "type": "text",
-                          "id": "lu25e",
-                          "name": "s2txd_c",
-                          "fill": "#000000",
-                          "content": "문화 · 같이 · 저녁",
-                          "fontFamily": "Outfit",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
+                          "type": "frame",
+                          "id": "WFXB1",
+                          "name": "s2txd_sub",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "qknUa",
+                              "name": "d1",
+                              "fill": "#000000",
+                              "content": "저녁 · 문화 · ",
+                              "fontFamily": "Outfit",
+                              "fontSize": 12
+                            },
+                            {
+                              "type": "text",
+                              "id": "N1858",
+                              "name": "d2",
+                              "fill": "#000000",
+                              "content": "같이",
+                              "fontFamily": "Outfit",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
                         }
                       ]
                     },
@@ -4549,32 +4823,35 @@
                       "name": "s5av1",
                       "width": 56,
                       "height": 56,
-                      "fill": "#C8F0D8",
+                      "fill": "#f2d9e1",
                       "cornerRadius": 100,
                       "justifyContent": "center",
                       "alignItems": "center",
                       "children": [
                         {
-                          "type": "text",
-                          "id": "Rw2lo",
-                          "name": "s5av1_t",
-                          "fill": "#1A1918",
-                          "content": "👩",
-                          "fontFamily": "Inter",
-                          "fontSize": 24,
-                          "fontWeight": "normal"
+                          "type": "frame",
+                          "id": "xq3rG",
+                          "name": "s5av1_img",
+                          "width": 44,
+                          "height": 44,
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "./images/HMHJX.png",
+                            "mode": "fit"
+                          },
+                          "cornerRadius": 22
                         }
                       ]
                     },
                     {
-                      "type": "text",
-                      "id": "zc6uU",
-                      "name": "s5heart",
-                      "fill": "#D08068",
-                      "content": "❤️",
-                      "fontFamily": "Inter",
-                      "fontSize": 16,
-                      "fontWeight": "normal"
+                      "type": "icon_font",
+                      "id": "Qg9ft",
+                      "width": 18,
+                      "height": 18,
+                      "iconFontName": "heart",
+                      "iconFontFamily": "lucide",
+                      "fill": "#E05C5C"
                     },
                     {
                       "type": "frame",
@@ -4582,20 +4859,24 @@
                       "name": "s5av2",
                       "width": 56,
                       "height": 56,
-                      "fill": "#E8F5EC",
+                      "fill": "#cbdfee",
                       "cornerRadius": 100,
                       "justifyContent": "center",
                       "alignItems": "center",
                       "children": [
                         {
-                          "type": "text",
-                          "id": "ciH51",
-                          "name": "s5av2_t",
-                          "fill": "#1A1918",
-                          "content": "👨",
-                          "fontFamily": "Inter",
-                          "fontSize": 24,
-                          "fontWeight": "normal"
+                          "type": "frame",
+                          "id": "gpEA1",
+                          "name": "s5av2_img",
+                          "width": 44,
+                          "height": 44,
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "./images/aRbFP.png",
+                            "mode": "fit"
+                          },
+                          "cornerRadius": 22
                         }
                       ]
                     }
@@ -4686,6 +4967,244 @@
                       "fontFamily": "Outfit",
                       "fontSize": 13,
                       "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "y1CsQ",
+              "name": "sec_card",
+              "width": "fill_container",
+              "fill": "#FFFFFF",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "wNjpT",
+                  "name": "c_hdr_wrap",
+                  "width": "fill_container",
+                  "padding": [
+                    12,
+                    16,
+                    6,
+                    16
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "JyNOR",
+                      "name": "chdrt",
+                      "fill": "#000000",
+                      "content": "내 카드",
+                      "fontFamily": "Outfit",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "Oa0hz",
+                  "name": "c_div_a",
+                  "fill": "$--canvas",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "BXbxc",
+                  "name": "card_row_1",
+                  "width": "fill_container",
+                  "gap": 12,
+                  "padding": 16,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "vqDDA",
+                      "name": "c1ic",
+                      "width": 20,
+                      "height": 20,
+                      "iconFontName": "credit-card",
+                      "iconFontFamily": "lucide",
+                      "fill": "#000000"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "cFhna",
+                      "name": "c1_info",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "aaQ8K",
+                          "name": "c1n",
+                          "fill": "#000000",
+                          "content": "신한카드",
+                          "fontFamily": "Outfit",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "7PUOK",
+                          "name": "c1s",
+                          "fill": "#000000",
+                          "content": "**** 1234",
+                          "fontFamily": "Outfit",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "kJxBq",
+                      "name": "c1_del",
+                      "width": 28,
+                      "height": 28,
+                      "fill": "#FFF0F0",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "eoZGQ",
+                          "name": "c1delic",
+                          "width": 14,
+                          "height": 14,
+                          "iconFontName": "minus",
+                          "iconFontFamily": "lucide",
+                          "fill": "#E05C5C"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "RIOY7",
+                  "name": "c_div_b",
+                  "fill": "$--canvas",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "dIjTX",
+                  "name": "card_row_2",
+                  "width": "fill_container",
+                  "gap": 12,
+                  "padding": 16,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "yxzIc",
+                      "name": "c2ic",
+                      "width": 20,
+                      "height": 20,
+                      "iconFontName": "credit-card",
+                      "iconFontFamily": "lucide",
+                      "fill": "#000000"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ntCGd",
+                      "name": "c2_info",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "vqewG",
+                          "name": "c2n",
+                          "fill": "#000000",
+                          "content": "국민카드",
+                          "fontFamily": "Outfit",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "USqqH",
+                          "name": "c2s",
+                          "fill": "#000000",
+                          "content": "**** 5678",
+                          "fontFamily": "Outfit",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "00yZj",
+                      "name": "c2_del",
+                      "width": 28,
+                      "height": 28,
+                      "fill": "#FFF0F0",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "ldSum",
+                          "name": "c2delic",
+                          "width": 14,
+                          "height": 14,
+                          "iconFontName": "minus",
+                          "iconFontFamily": "lucide",
+                          "fill": "#E05C5C"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "Rv6JK",
+                  "name": "c_div_c",
+                  "fill": "$--canvas",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "BqElH",
+                  "name": "card_add_row",
+                  "width": "fill_container",
+                  "gap": 12,
+                  "padding": 16,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "B7H59",
+                      "name": "addic",
+                      "width": 20,
+                      "height": 20,
+                      "iconFontName": "circle-plus",
+                      "iconFontFamily": "lucide",
+                      "fill": "$--primary"
+                    },
+                    {
+                      "type": "text",
+                      "id": "H5fSZ",
+                      "name": "addtxt",
+                      "fill": "$--primary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "카드 추가",
+                      "fontFamily": "Outfit",
+                      "fontSize": 15,
+                      "fontWeight": "500"
                     }
                   ]
                 }
@@ -13410,6 +13929,7 @@
               "id": "uoOct",
               "name": "Chips & Badges",
               "width": 480,
+              "height": 198,
               "layout": "vertical",
               "gap": 16,
               "children": [
@@ -13418,7 +13938,7 @@
                   "id": "AJe9n",
                   "name": "c3_title",
                   "fill": "#1A1918",
-                  "content": "Chip · Badge · Toggle",
+                  "content": " Badge · Toggle",
                   "fontFamily": "Inter",
                   "fontSize": 15,
                   "fontWeight": "700"
@@ -13428,160 +13948,10 @@
                   "id": "JISog",
                   "name": "c3_sub",
                   "fill": "#1A1918",
-                  "content": "선택 칩, 뱃지, 토글의 상태 변형",
+                  "content": "선택 뱃지, 토글의 상태 변형",
                   "fontFamily": "Inter",
                   "fontSize": 11,
                   "fontWeight": "normal"
-                },
-                {
-                  "type": "frame",
-                  "id": "jJILw",
-                  "name": "Chips",
-                  "layout": "vertical",
-                  "gap": 8,
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "TEgih",
-                      "name": "chp_lbl",
-                      "fill": "#1A1918",
-                      "content": "Category Chips",
-                      "fontFamily": "Inter",
-                      "fontSize": 11,
-                      "fontWeight": "600"
-                    },
-                    {
-                      "type": "frame",
-                      "id": "pjNdG",
-                      "name": "chp_row",
-                      "gap": 8,
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "frame",
-                          "id": "S0wBv",
-                          "name": "ca",
-                          "fill": "$--primary",
-                          "cornerRadius": 100,
-                          "padding": 12,
-                          "justifyContent": "center",
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "vJzYa",
-                              "fill": "#FFFFFF",
-                              "content": "식비",
-                              "fontFamily": "Inter",
-                              "fontSize": 13,
-                              "fontWeight": "600"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "hfXLJ",
-                          "name": "cb",
-                          "fill": "#ffffffff",
-                          "cornerRadius": 100,
-                          "padding": 12,
-                          "justifyContent": "center",
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "SJfcC",
-                              "fill": "#6D6C6A",
-                              "content": "교통",
-                              "fontFamily": "Inter",
-                              "fontSize": 13,
-                              "fontWeight": "500"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "y4TVj",
-                          "name": "cc",
-                          "fill": "#ffbb75ff",
-                          "cornerRadius": 100,
-                          "padding": 12,
-                          "justifyContent": "center",
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "W4lP6",
-                              "fill": "#1A1918",
-                              "content": "쇼핑",
-                              "fontFamily": "Inter",
-                              "fontSize": 13,
-                              "fontWeight": "500"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "05ziE",
-                      "name": "chp_note",
-                      "width": "fill_container",
-                      "gap": 6,
-                      "children": [
-                        {
-                          "type": "text",
-                          "id": "TJSB0",
-                          "name": "cn1",
-                          "fill": "#1A1918",
-                          "content": "Active",
-                          "fontFamily": "Inter",
-                          "fontSize": 10,
-                          "fontWeight": "600"
-                        },
-                        {
-                          "type": "text",
-                          "id": "FS19k",
-                          "name": "cn2",
-                          "fill": "#1A1918",
-                          "content": "·",
-                          "fontFamily": "Inter",
-                          "fontSize": 10,
-                          "fontWeight": "normal"
-                        },
-                        {
-                          "type": "text",
-                          "id": "Ea9DC",
-                          "name": "cn3",
-                          "fill": "#1A1918",
-                          "content": "Unselected",
-                          "fontFamily": "Inter",
-                          "fontSize": 10,
-                          "fontWeight": "500"
-                        },
-                        {
-                          "type": "text",
-                          "id": "FCQ5y",
-                          "name": "cn4",
-                          "fill": "#1A1918",
-                          "content": "·",
-                          "fontFamily": "Inter",
-                          "fontSize": 10,
-                          "fontWeight": "normal"
-                        },
-                        {
-                          "type": "text",
-                          "id": "37Fia",
-                          "name": "cn5",
-                          "fill": "#1A1918",
-                          "content": "Disabled",
-                          "fontFamily": "Inter",
-                          "fontSize": 10,
-                          "fontWeight": "500"
-                        }
-                      ]
-                    }
-                  ]
                 },
                 {
                   "type": "frame",
@@ -18122,14 +18492,39 @@
                   ]
                 },
                 {
-                  "type": "text",
-                  "id": "IrI37",
-                  "name": "month_title",
-                  "fill": "#1A1918",
-                  "content": "2026년 3월",
-                  "fontFamily": "Outfit",
-                  "fontSize": 17,
-                  "fontWeight": "700"
+                  "type": "frame",
+                  "id": "jGIsY",
+                  "name": "month_btn",
+                  "fill": "$--canvas",
+                  "cornerRadius": 8,
+                  "gap": 4,
+                  "padding": [
+                    4,
+                    10
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "6qnAj",
+                      "name": "cmt",
+                      "fill": "#000000",
+                      "content": "2026년 3월",
+                      "fontFamily": "Outfit",
+                      "fontSize": 17,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "UpmRZ",
+                      "name": "cmc",
+                      "width": 16,
+                      "height": 16,
+                      "iconFontName": "chevron-down",
+                      "iconFontFamily": "lucide",
+                      "fill": "#000000"
+                    }
+                  ]
                 },
                 {
                   "type": "frame",
@@ -20039,7 +20434,7 @@
     {
       "type": "frame",
       "id": "9S0lu",
-      "x": 2190,
+      "x": 2188,
       "y": 0,
       "name": "Screen: 캘린더 (일별 팝업)",
       "clip": true,
@@ -20156,14 +20551,39 @@
                   ]
                 },
                 {
-                  "type": "text",
-                  "id": "ztgBj",
-                  "name": "month_title",
-                  "fill": "#1A1918",
-                  "content": "2026년 3월",
-                  "fontFamily": "Outfit",
-                  "fontSize": 17,
-                  "fontWeight": "700"
+                  "type": "frame",
+                  "id": "bq1Zd",
+                  "name": "month_btn",
+                  "fill": "$--canvas",
+                  "cornerRadius": 8,
+                  "gap": 4,
+                  "padding": [
+                    4,
+                    10
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "O1r4U",
+                      "name": "mt",
+                      "fill": "#000000",
+                      "content": "2026년 3월",
+                      "fontFamily": "Outfit",
+                      "fontSize": 17,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "WtSN1",
+                      "name": "mc",
+                      "width": 16,
+                      "height": 16,
+                      "iconFontName": "chevron-down",
+                      "iconFontFamily": "lucide",
+                      "fill": "#000000"
+                    }
+                  ]
                 },
                 {
                   "type": "frame",
@@ -22050,6 +22470,716 @@
                   "fontWeight": "500"
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "pKRLN",
+      "x": 2601,
+      "y": 0,
+      "name": "Screen: 가계명 변경",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$--background",
+      "cornerRadius": 40,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "g3lPM",
+          "name": "sb2",
+          "width": "fill_container",
+          "height": 62,
+          "fill": "#FFFFFF",
+          "padding": [
+            0,
+            24
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "6uUnY",
+              "name": "sb1_time",
+              "fill": "#1A1918",
+              "content": "9:41",
+              "fontFamily": "Outfit",
+              "fontSize": 15,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "Prbb9",
+              "name": "sb1_icons",
+              "gap": 5,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "4fe4w",
+                  "name": "sb1_signal",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "signal",
+                  "iconFontFamily": "lucide",
+                  "fill": "$--foreground"
+                },
+                {
+                  "type": "icon_font",
+                  "id": "NnZMu",
+                  "name": "sb1_wifi",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "wifi",
+                  "iconFontFamily": "lucide",
+                  "fill": "$--foreground"
+                },
+                {
+                  "type": "icon_font",
+                  "id": "vtmtv",
+                  "name": "sb1_bat",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "battery-full",
+                  "iconFontFamily": "lucide",
+                  "fill": "$--foreground"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "DfS25",
+          "name": "rn_hdr",
+          "width": "fill_container",
+          "height": 56,
+          "gap": 12,
+          "padding": [
+            0,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "TjQCT",
+              "name": "back_btn",
+              "width": 40,
+              "height": 40,
+              "fill": "$--canvas",
+              "cornerRadius": 12,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "FqK3e",
+                  "name": "bkic",
+                  "width": 20,
+                  "height": 20,
+                  "iconFontName": "chevron-left",
+                  "iconFontFamily": "lucide",
+                  "fill": "#000000"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "as6tI",
+              "name": "htitle",
+              "fill": "#000000",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "가계명 변경",
+              "fontFamily": "Outfit",
+              "fontSize": 17,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "QZUyx",
+          "name": "rn_con",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 24,
+          "padding": [
+            24,
+            20,
+            32,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "ErHes",
+              "name": "cur_lbl",
+              "fill": "#000000",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "현재 가계명",
+              "fontFamily": "Outfit",
+              "fontSize": 12
+            },
+            {
+              "type": "frame",
+              "id": "J9pyV",
+              "name": "cur_chip",
+              "width": "fill_container",
+              "fill": "$--card",
+              "cornerRadius": 12,
+              "gap": 8,
+              "padding": [
+                12,
+                16
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "r5pdm",
+                  "name": "cur_name",
+                  "fill": "#000000",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "우리 가계부",
+                  "fontFamily": "Outfit",
+                  "fontSize": 16,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "zPqUJ",
+              "name": "inp_sec",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "ELTaC",
+                  "name": "inp_lbl_row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "epvom",
+                      "name": "inp_lbl",
+                      "fill": "#000000",
+                      "content": "가계명",
+                      "fontFamily": "Outfit",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ZEkK4",
+                      "name": "inp_cnt",
+                      "fill": "#000000",
+                      "content": "5 / 12",
+                      "fontFamily": "Outfit",
+                      "fontSize": 11
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "thbS5",
+                  "name": "inp_box",
+                  "width": "fill_container",
+                  "fill": "$--card",
+                  "cornerRadius": 14,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1.5,
+                    "fill": "$--primary"
+                  },
+                  "gap": 8,
+                  "padding": [
+                    14,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "cS53w",
+                      "name": "inp_txt",
+                      "fill": "#000000",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "우리 가계부",
+                      "fontFamily": "Outfit",
+                      "fontSize": 15
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Qb0qx",
+              "name": "spacer",
+              "width": "fill_container",
+              "height": "fill_container"
+            },
+            {
+              "type": "frame",
+              "id": "VaeyE",
+              "name": "save_btn",
+              "width": "fill_container",
+              "height": 56,
+              "fill": "$--primary",
+              "cornerRadius": 100,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ydfpz",
+                  "name": "save_txt",
+                  "fill": "#FFFFFF",
+                  "content": "저장하기",
+                  "fontFamily": "Outfit",
+                  "fontSize": 16,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "AGs1J",
+      "x": 860,
+      "y": 120,
+      "name": "Popup: 년도/월 선택",
+      "clip": true,
+      "width": 280,
+      "height": 220,
+      "fill": "$--card",
+      "cornerRadius": 16,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "efktV",
+          "name": "ym_hdr",
+          "width": "fill_container",
+          "height": 48,
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "HV2vm",
+              "name": "ymtl",
+              "fill": "#000000",
+              "content": "날짜 선택",
+              "fontFamily": "Outfit",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "icon_font",
+              "id": "4jFNC",
+              "name": "ymcl",
+              "width": 18,
+              "height": 18,
+              "iconFontName": "x",
+              "iconFontFamily": "lucide",
+              "fill": "#000000"
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "LYWfG",
+          "name": "ym_div",
+          "fill": "$--border",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "frame",
+          "id": "tDltl",
+          "name": "ym_pickers",
+          "width": "fill_container",
+          "height": "fill_container",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "y3y70",
+              "name": "year_col",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 2,
+              "padding": [
+                8,
+                0
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "4pKDC",
+                  "name": "yr1",
+                  "fill": "#000000",
+                  "content": "2025",
+                  "fontFamily": "Outfit",
+                  "fontSize": 14
+                },
+                {
+                  "type": "frame",
+                  "id": "NewAF",
+                  "name": "yr_sel",
+                  "width": "fill_container",
+                  "height": 36,
+                  "fill": "$--primary",
+                  "cornerRadius": 8,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "aP150",
+                      "name": "yvt",
+                      "fill": "#FFFFFF",
+                      "content": "2026",
+                      "fontFamily": "Outfit",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "zCaZz",
+                  "name": "yr3",
+                  "fill": "#000000",
+                  "content": "2027",
+                  "fontFamily": "Outfit",
+                  "fontSize": 14
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "G34PP",
+              "name": "month_col",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 2,
+              "padding": [
+                8,
+                0
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ZKN1X",
+                  "name": "mn1",
+                  "fill": "#000000",
+                  "content": "1월  2월  3월",
+                  "fontFamily": "Outfit",
+                  "fontSize": 12
+                },
+                {
+                  "type": "frame",
+                  "id": "vuZym",
+                  "name": "mn_sel",
+                  "width": "fill_container",
+                  "height": 36,
+                  "fill": "$--primary",
+                  "cornerRadius": 8,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "rk5NZ",
+                      "name": "mvt",
+                      "fill": "#FFFFFF",
+                      "content": "3월",
+                      "fontFamily": "Outfit",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "RkRgN",
+                  "name": "mn3",
+                  "fill": "#000000",
+                  "content": "4월  5월  6월",
+                  "fontFamily": "Outfit",
+                  "fontSize": 12
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "xch2a",
+      "x": 1720,
+      "y": 290,
+      "name": "Popup: 회원탈퇴 확인",
+      "width": 390,
+      "height": 264,
+      "layout": "vertical",
+      "justifyContent": "center",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "rectangle",
+          "id": "NWpQx",
+          "name": "wd_dim",
+          "fill": "#1A191866",
+          "width": 390,
+          "height": 264
+        },
+        {
+          "type": "frame",
+          "id": "tJLFu",
+          "name": "wd_card",
+          "width": 320,
+          "height": 224,
+          "fill": "#FFFFFF",
+          "cornerRadius": 20,
+          "layout": "vertical",
+          "gap": 16,
+          "padding": 24,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "iXcKT",
+              "name": "wdic",
+              "width": 36,
+              "height": 36,
+              "iconFontName": "circle-alert",
+              "iconFontFamily": "lucide",
+              "fill": "#C47B6A"
+            },
+            {
+              "type": "text",
+              "id": "dxTHZ",
+              "name": "wdtitle",
+              "fill": "#000000",
+              "content": "정말 탈퇴하시겠어요?",
+              "textAlign": "center",
+              "fontFamily": "Outfit",
+              "fontSize": 17,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "ytywS",
+              "name": "wdsub",
+              "fill": "#000000",
+              "content": "탈퇴 시 모든 데이터가 삭제되며\n복구할 수 없습니다.",
+              "textAlign": "center",
+              "fontFamily": "Outfit",
+              "fontSize": 13
+            },
+            {
+              "type": "frame",
+              "id": "YkUAd",
+              "name": "wd_btns",
+              "width": "fill_container",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "AGNKV",
+                  "name": "wd_cancel",
+                  "width": "fill_container",
+                  "height": 48,
+                  "fill": "$--canvas",
+                  "cornerRadius": 12,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "YTz1M",
+                      "name": "t1",
+                      "fill": "#000000",
+                      "content": "취소",
+                      "fontFamily": "Outfit",
+                      "fontSize": 15,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Qbcgq",
+                  "name": "wd_confirm",
+                  "width": "fill_container",
+                  "height": 48,
+                  "fill": "#FFF0F0",
+                  "cornerRadius": 12,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "zWOJ4",
+                      "name": "t2",
+                      "fill": "#C47B6A",
+                      "content": "탈퇴",
+                      "fontFamily": "Outfit",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "BDpL6",
+      "x": 1720,
+      "y": 600,
+      "name": "Popup: 카드 추가",
+      "clip": true,
+      "width": 390,
+      "height": 244,
+      "fill": "$--card",
+      "cornerRadius": [
+        20,
+        20,
+        0,
+        0
+      ],
+      "layout": "vertical",
+      "gap": 16,
+      "padding": [
+        12,
+        20,
+        32,
+        20
+      ],
+      "children": [
+        {
+          "type": "frame",
+          "id": "cgAlP",
+          "name": "c_handle",
+          "width": "fill_container",
+          "height": 20,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "rectangle",
+              "cornerRadius": 2,
+              "id": "rssAf",
+              "name": "handle_bar",
+              "fill": "$--border",
+              "width": 36,
+              "height": 4
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "AuWg9",
+          "name": "ctitle",
+          "fill": "#000000",
+          "content": "카드 추가",
+          "fontFamily": "Outfit",
+          "fontSize": 16,
+          "fontWeight": "700"
+        },
+        {
+          "type": "frame",
+          "id": "dJq8G",
+          "name": "c_inp",
+          "width": "fill_container",
+          "height": 52,
+          "fill": "$--canvas",
+          "cornerRadius": 14,
+          "gap": 8,
+          "padding": [
+            0,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "1Ziog",
+              "name": "cinpic",
+              "width": 18,
+              "height": 18,
+              "iconFontName": "credit-card",
+              "iconFontFamily": "lucide",
+              "fill": "#000000"
+            },
+            {
+              "type": "text",
+              "id": "hu4aL",
+              "name": "cinptxt",
+              "fill": "#000000",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "카드 별칭 입력 (예: 내 신한카드)",
+              "fontFamily": "Outfit",
+              "fontSize": 14
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "GMG3h",
+          "name": "c_save",
+          "width": "fill_container",
+          "height": 52,
+          "fill": "$--primary",
+          "cornerRadius": 100,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "aNHeG",
+              "name": "csavet",
+              "fill": "#FFFFFF",
+              "content": "추가하기",
+              "fontFamily": "Outfit",
+              "fontSize": 16,
+              "fontWeight": "600"
             }
           ]
         }

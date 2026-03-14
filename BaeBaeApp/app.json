@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "배배",
+    "slug": "baebae-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/ios_icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/CYaV3.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#F7F3EE"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.baebae.app",
+      "icon": "./assets/ios_icon.png"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/ios_icon.png",
+        "backgroundColor": "#F5F4F0"
+      },
+      "package": "com.baebae.app"
+    }
+  }
+}

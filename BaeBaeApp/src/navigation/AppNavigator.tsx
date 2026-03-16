@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
+import { useAuth } from '../context/AuthContext';
 
 import LoginScreen from '../screens/LoginScreen';
 import CoupleIconScreen from '../screens/CoupleIconScreen';
@@ -89,15 +90,32 @@ function MainTabs() {
 }
 
 export default function AppNavigator() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-      <Stack.Screen name="Login"         component={LoginScreen} />
-      <Stack.Screen name="CoupleIcon"    component={CoupleIconScreen} />
-      <Stack.Screen name="ProfileSetup"  component={ProfileSetupScreen} />
-      <Stack.Screen name="InviteCode"    component={InviteCodeScreen} />
-      <Stack.Screen name="HouseholdName"    component={HouseholdNameScreen} />
-      <Stack.Screen name="RenameHousehold" component={RenameHouseholdScreen} />
-      <Stack.Screen name="MainTabs"        component={MainTabs} />
+      {user ? (
+        <>
+          <Stack.Screen name="MainTabs"        component={MainTabs} />
+          <Stack.Screen name="RenameHousehold" component={RenameHouseholdScreen} />
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="Login"         component={LoginScreen} />
+          <Stack.Screen name="CoupleIcon"    component={CoupleIconScreen} />
+          <Stack.Screen name="ProfileSetup"  component={ProfileSetupScreen} />
+          <Stack.Screen name="InviteCode"    component={InviteCodeScreen} />
+          <Stack.Screen name="HouseholdName" component={HouseholdNameScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 }

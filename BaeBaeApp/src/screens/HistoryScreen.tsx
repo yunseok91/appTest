@@ -1,62 +1,173 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
-  ScrollView, Modal,
+  ScrollView, Modal, Alert, TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../theme/colors';
-
-const ME = 'minji'; // 로그인된 사용자
+import { useTransactions, type Transaction } from '../context/TransactionContext';
+import { useAuth } from '../context/AuthContext';
+import PhotoViewerModal from '../components/PhotoViewerModal';
 
 type TimeSlot = '아침' | '점심' | '저녁';
-type Person = 'minji' | 'junho';
-
-type Transaction = {
-  id: number;
-  category: string;
-  iconName: keyof typeof Ionicons.glyphMap;
-  iconColor: string;
-  iconBg: string;
-  memo: string;
-  amount: number;
-  dateGroup: string;
-  time: TimeSlot;
-  person: Person;
-};
-
-const DUMMY: Transaction[] = [
-  { id: 1, category: '식비',     iconName: 'restaurant-outline', iconColor: '#D89575', iconBg: '#FFF3E8', memo: '스타벅스',      amount: -6500,    dateGroup: '오늘',    time: '아침', person: 'minji' },
-  { id: 2, category: '교통',     iconName: 'bus-outline',        iconColor: '#4A90D9', iconBg: '#EBF4FF', memo: '버스 교통카드', amount: -1400,    dateGroup: '오늘',    time: '점심', person: 'junho' },
-  { id: 3, category: '수입',     iconName: 'cash-outline',       iconColor: '#3D8A5A', iconBg: '#E8F5EC', memo: '급여 입금',     amount: 2300000,  dateGroup: '어제',    time: '아침', person: 'junho' },
-  { id: 4, category: '문화/여가', iconName: 'film-outline',       iconColor: '#7B5FA0', iconBg: '#F0EBFF', memo: 'CGV',           amount: -25000,   dateGroup: '어제',    time: '저녁', person: 'minji' },
-  { id: 5, category: '쇼핑',     iconName: 'bag-handle-outline', iconColor: '#C45FAA', iconBg: '#F5EDFF', memo: '올리브영',      amount: -45000,   dateGroup: '3월 13일', time: '점심', person: 'minji' },
-  { id: 6, category: '교통',     iconName: 'bus-outline',        iconColor: '#4A90D9', iconBg: '#EBF4FF', memo: '택시',          amount: -9800,    dateGroup: '3월 12일', time: '저녁', person: 'junho' },
-];
-
 const TIME_SLOTS: TimeSlot[] = ['아침', '점심', '저녁'];
 const TIME_EMOJI: Record<TimeSlot, string> = { 아침: '🌅', 점심: '☀️', 저녁: '🌙' };
 
+const ITEM_H = 48;
+const YEARS = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030];
+const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+function WheelPicker({ items, selectedIndex, onSelect, format }: {
+  items: number[];
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+  format?: (v: number) => string;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
+  const label = format ?? ((v: number) => String(v));
+
+  useEffect(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
+    }, 50);
+  }, [selectedIndex]);
+
+  const handleSnap = (e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
+    const clamped = Math.max(0, Math.min(idx, items.length - 1));
+    onSelect(clamped);
+  };
+
+  return (
+    <View style={styles.wheelOuter}>
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_H}
+        decelerationRate="fast"
+        nestedScrollEnabled
+        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
+        onMomentumScrollEnd={handleSnap}
+        onScrollEndDrag={handleSnap}
+      >
+        {items.map((v, i) => {
+          const dist = Math.abs(i - selectedIndex);
+          const isSelected = dist === 0;
+          const opacity = dist === 0 ? 1 : dist === 1 ? 0.55 : 0.25;
+          const fontSize = dist === 0 ? 17 : dist === 1 ? 15 : 13;
+          const fontWeight = dist === 0 ? fonts.bold : fonts.regular;
+          return (
+            <View key={v} style={[styles.wheelItem, isSelected && styles.wheelItemSelected]}>
+              <Text style={[styles.wheelText, {
+                opacity,
+                fontSize,
+                fontFamily: fontWeight,
+                color: isSelected ? '#FFFFFF' : colors.text,
+              }]}>
+                {label(v)}
+              </Text>
+            </View>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+function getDateLabel(dateStr: string): string {
+  const today = new Date();
+  const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const y = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+  if (dateStr === t) return '오늘';
+  if (dateStr === y) return '어제';
+  const [, m, d] = dateStr.split('-');
+  return `${Number(m)}월 ${Number(d)}일`;
+}
+
+function TxRow({ tx, onPress }: { tx: Transaction; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.txRow} onPress={onPress} activeOpacity={0.75}>
+      <View style={[styles.txIconWrap, { backgroundColor: tx.categoryBgColor }]}>
+        <Ionicons name={tx.categoryIcon as any} size={18} color={tx.categoryIconColor} />
+      </View>
+      <View style={styles.txInfo}>
+        <Text style={styles.txMemo}>{tx.memo || tx.category}</Text>
+        <View style={styles.txMeta}>
+          <Text style={styles.txMetaText}>{tx.time} · {tx.category} · </Text>
+          <Text style={[styles.txMetaName, { color: colors.primary }]}>{tx.person}</Text>
+        </View>
+      </View>
+      <Text style={[styles.txAmount, { color: tx.type === 'income' ? colors.primary : colors.secondary }]}>
+        {tx.type === 'income' ? '+' : '-'}₩{tx.amount.toLocaleString()}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
+  const { transactions, deleteTransaction, updateTransaction } = useTransactions();
+  const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<'전체' | '지출' | '수입'>('전체');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [editTx, setEditTx] = useState<Transaction | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editMemo, setEditMemo] = useState('');
+  const [editTime, setEditTime] = useState<'아침' | '점심' | '저녁'>('아침');
+  const [viewPhotoUri, setViewPhotoUri] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [year, setYear] = useState(2026);
-  const [month, setMonth] = useState(3);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'recent' | 'high' | 'low'>('recent');
+  const [personFilter, setPersonFilter] = useState<'전체' | '나' | '파트너'>('전체');
 
-  const filtered = DUMMY.filter(item => {
-    if (activeFilter === '지출') return item.amount < 0;
-    if (activeFilter === '수입') return item.amount > 0;
-    return true;
-  });
+  const myName = user?.name ?? '나';
+  const isFilterActive = sortOrder !== 'recent' || personFilter !== '전체';
 
-  const groups = filtered.reduce<Record<string, Transaction[]>>((acc, tx) => {
-    (acc[tx.dateGroup] = acc[tx.dateGroup] ?? []).push(tx);
-    return acc;
-  }, {});
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [pickYearIdx, setPickYearIdx] = useState(YEARS.indexOf(now.getFullYear()));
+  const [pickMonthIdx, setPickMonthIdx] = useState(now.getMonth());
 
-  const GROUP_ORDER = ['오늘', '어제', '3월 13일', '3월 12일'];
+  const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+
+  const filtered = useMemo(() => {
+    return transactions.filter(tx => {
+      if (!tx.date.startsWith(monthStr)) return false;
+      if (activeFilter === '지출' && tx.type !== 'expense') return false;
+      if (activeFilter === '수입' && tx.type !== 'income') return false;
+      if (personFilter === '나' && tx.person !== myName) return false;
+      if (personFilter === '파트너' && tx.person === myName) return false;
+      return true;
+    });
+  }, [transactions, monthStr, activeFilter, personFilter, myName]);
+
+  const sortedFiltered = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      if (sortOrder === 'high') return b.amount - a.amount;
+      if (sortOrder === 'low') return a.amount - b.amount;
+      return b.date.localeCompare(a.date);
+    });
+  }, [filtered, sortOrder]);
+
+  const groups = useMemo(() => {
+    if (sortOrder !== 'recent') return null;
+    const map: Record<string, Transaction[]> = {};
+    sortedFiltered.forEach(tx => {
+      const label = getDateLabel(tx.date);
+      (map[label] = map[label] ?? []).push(tx);
+    });
+    return map;
+  }, [sortedFiltered, sortOrder]);
+
+  const GROUP_ORDER = groups ? Object.keys(groups) : [];
+
+  const totalIncome  = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalExpense = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const balance = totalIncome - totalExpense;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -65,8 +176,13 @@ export default function HistoryScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>거래 내역</Text>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
-          <Ionicons name="options-outline" size={20} color={colors.text} />
+        <TouchableOpacity
+          style={[styles.iconBtn, isFilterActive && styles.iconBtnActive]}
+          onPress={() => setShowFilterSheet(true)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="options-outline" size={20} color={isFilterActive ? '#FFFFFF' : colors.text} />
+          {isFilterActive && <View style={styles.filterBadge} />}
         </TouchableOpacity>
       </View>
 
@@ -89,7 +205,18 @@ export default function HistoryScreen() {
         <TouchableOpacity style={styles.navBtn} onPress={() => setMonth(m => m > 1 ? m - 1 : 12)} activeOpacity={0.8}>
           <Ionicons name="chevron-back" size={18} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.monthLabel}>{year}년 {month}월</Text>
+        <TouchableOpacity
+          style={styles.monthBtn}
+          onPress={() => {
+            setPickYearIdx(YEARS.indexOf(year));
+            setPickMonthIdx(month - 1);
+            setShowDatePicker(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.monthLabel}>{year}년 {month}월</Text>
+          <Ionicons name="chevron-down" size={14} color={colors.text} />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.navBtn} onPress={() => setMonth(m => m < 12 ? m + 1 : 1)} activeOpacity={0.8}>
           <Ionicons name="chevron-forward" size={18} color={colors.text} />
         </TouchableOpacity>
@@ -98,9 +225,9 @@ export default function HistoryScreen() {
       {/* Summary bar */}
       <View style={styles.summaryBar}>
         {[
-          { label: '수입', value: '+₩2,300,000', color: colors.primary },
-          { label: '지출', value: '-₩77,900',    color: colors.secondary },
-          { label: '잔액', value: '₩2,222,100',  color: colors.text },
+          { label: '수입', value: `+₩${totalIncome.toLocaleString()}`,   color: colors.primary },
+          { label: '지출', value: `-₩${totalExpense.toLocaleString()}`,  color: colors.secondary },
+          { label: '잔액', value: `₩${balance.toLocaleString()}`,        color: colors.text },
         ].map((s, i) => (
           <React.Fragment key={s.label}>
             {i > 0 && <View style={styles.summaryDivider} />}
@@ -114,35 +241,21 @@ export default function HistoryScreen() {
 
       {/* Transaction list */}
       <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-        {GROUP_ORDER.filter(g => groups[g]?.length).map((dateGroup) => (
-          <View key={dateGroup}>
-            <Text style={styles.dateHeader}>{dateGroup}</Text>
-            {groups[dateGroup].map((tx) => (
-              <TouchableOpacity
-                key={tx.id}
-                style={styles.txRow}
-                onPress={() => setSelectedTx(tx)}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.txIconWrap, { backgroundColor: tx.iconBg }]}>
-                  <Ionicons name={tx.iconName} size={18} color={tx.iconColor} />
-                </View>
-                <View style={styles.txInfo}>
-                  <Text style={styles.txMemo}>{tx.memo}</Text>
-                  <View style={styles.txMeta}>
-                    <Text style={styles.txMetaText}>{tx.time} · {tx.category} · </Text>
-                    <Text style={[styles.txMetaName, { color: tx.person === 'minji' ? '#C4729A' : '#4A90D9' }]}>
-                      {tx.person === 'minji' ? '민지' : '준호'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={[styles.txAmount, { color: tx.amount > 0 ? colors.primary : colors.secondary }]}>
-                  {tx.amount > 0 ? '+' : ''}₩{Math.abs(tx.amount).toLocaleString()}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        {sortedFiltered.length === 0 && (
+          <View style={styles.emptyWrap}>
+            <Ionicons name="receipt-outline" size={40} color={colors.border} />
+            <Text style={styles.emptyText}>이번 달 거래 내역이 없어요</Text>
           </View>
-        ))}
+        )}
+        {groups !== null
+          ? GROUP_ORDER.filter(g => groups[g]?.length).map((dateGroup) => (
+            <View key={dateGroup}>
+              <Text style={styles.dateHeader}>{dateGroup}</Text>
+              {groups[dateGroup].map((tx) => <TxRow key={tx.id} tx={tx} onPress={() => setSelectedTx(tx)} />)}
+            </View>
+          ))
+          : sortedFiltered.map((tx) => <TxRow key={tx.id} tx={tx} onPress={() => setSelectedTx(tx)} />)
+        }
         <View style={{ height: 24 }} />
       </ScrollView>
 
@@ -152,30 +265,24 @@ export default function HistoryScreen() {
         {selectedTx && (
           <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.sheetHandle} />
-            {/* Category chip + close */}
             <View style={styles.sheetTopRow}>
-              <View style={[styles.catChip, { backgroundColor: selectedTx.iconBg }]}>
-                <Ionicons name={selectedTx.iconName} size={14} color={selectedTx.iconColor} />
-                <Text style={[styles.catChipText, { color: selectedTx.iconColor }]}>{selectedTx.category}</Text>
+              <View style={[styles.catChip, { backgroundColor: selectedTx.categoryBgColor }]}>
+                <Ionicons name={selectedTx.categoryIcon as any} size={14} color={selectedTx.categoryIconColor} />
+                <Text style={[styles.catChipText, { color: selectedTx.categoryIconColor }]}>{selectedTx.category}</Text>
               </View>
               <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setSelectedTx(null)}>
                 <Ionicons name="close" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            {/* Date + person */}
             <View style={styles.sheetMetaRow}>
-              <View style={[styles.personBadge, { backgroundColor: selectedTx.person === 'minji' ? '#FDF0F6' : '#EBF0FF' }]}>
-                <Text style={[styles.personBadgeText, { color: selectedTx.person === 'minji' ? '#C4729A' : '#4A90D9' }]}>
-                  {selectedTx.person === 'minji' ? '민지' : '준호'}
-                </Text>
+              <View style={[styles.personBadge, { backgroundColor: colors.primaryLighter }]}>
+                <Text style={[styles.personBadgeText, { color: colors.primary }]}>{selectedTx.person}</Text>
               </View>
-              <Text style={styles.sheetDate}>{selectedTx.dateGroup}</Text>
+              <Text style={styles.sheetDate}>{getDateLabel(selectedTx.date)}</Text>
             </View>
-            {/* Amount */}
-            <Text style={[styles.sheetAmt, { color: selectedTx.amount > 0 ? colors.primary : colors.text }]}>
-              {selectedTx.amount > 0 ? '+' : ''}₩{Math.abs(selectedTx.amount).toLocaleString()}
+            <Text style={[styles.sheetAmt, { color: selectedTx.type === 'income' ? colors.primary : colors.text }]}>
+              {selectedTx.type === 'income' ? '+' : '-'}₩{selectedTx.amount.toLocaleString()}
             </Text>
-            {/* Time selector */}
             <View style={styles.timeRow}>
               {TIME_SLOTS.map((t) => (
                 <View key={t} style={[styles.timeChip, selectedTx.time === t && styles.timeChipActive]}>
@@ -186,19 +293,55 @@ export default function HistoryScreen() {
               ))}
             </View>
             <View style={styles.sheetDivider} />
-            {/* Memo */}
             <View style={styles.memoSec}>
               <Text style={styles.memoLbl}>메모</Text>
-              <Text style={styles.memoTxt}>{selectedTx.memo}</Text>
+              <Text style={styles.memoTxt}>{selectedTx.memo || '(메모 없음)'}</Text>
             </View>
+            {selectedTx.photoUri && (
+              <>
+                <View style={styles.sheetDivider} />
+                <View style={styles.photoSec}>
+                  <Text style={styles.memoLbl}>첨부 사진</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      const uri = selectedTx.photoUri!;
+                      setSelectedTx(null);
+                      setViewPhotoUri(uri);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Image source={{ uri: selectedTx.photoUri }} style={styles.txPhoto} resizeMode="cover" />
+                    <View style={styles.photoExpandBtn}>
+                      <Ionicons name="expand-outline" size={16} color="#fff" />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
             <View style={styles.sheetDivider} />
-            {/* Actions — only if my record */}
-            {selectedTx.person === ME ? (
+            {selectedTx.person === (user?.name ?? '나') ? (
               <View style={styles.actionRow}>
-                <TouchableOpacity style={styles.editBtn} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setEditTx(selectedTx);
+                    setEditAmount(String(selectedTx.amount));
+                    setEditMemo(selectedTx.memo);
+                    setEditTime(selectedTx.time);
+                    setSelectedTx(null);
+                  }}
+                >
                   <Text style={styles.editBtnText}>수정</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.delBtn} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={styles.delBtn}
+                  activeOpacity={0.8}
+                  onPress={() => Alert.alert('삭제', '이 내역을 삭제할까요?', [
+                    { text: '취소', style: 'cancel' },
+                    { text: '삭제', style: 'destructive', onPress: () => { deleteTransaction(selectedTx.id); setSelectedTx(null); }},
+                  ])}
+                >
                   <Text style={styles.delBtnText}>삭제</Text>
                 </TouchableOpacity>
               </View>
@@ -212,46 +355,167 @@ export default function HistoryScreen() {
         )}
       </Modal>
 
-      {/* Date Picker Modal */}
-      <Modal visible={showDatePicker} animationType="fade" transparent onRequestClose={() => setShowDatePicker(false)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
-        <View style={styles.datePicker}>
-          <View style={styles.datePickerHeader}>
-            <Text style={styles.datePickerTitle}>날짜 선택</Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-              <Ionicons name="close" size={18} color={colors.textSecondary} />
+      {/* Filter Bottom Sheet */}
+      <Modal visible={showFilterSheet} animationType="slide" transparent onRequestClose={() => setShowFilterSheet(false)}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowFilterSheet(false)} />
+        <View style={[styles.filterSheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.filterSheetHeader}>
+            <Text style={styles.filterSheetTitle}>필터</Text>
+            <TouchableOpacity
+              onPress={() => { setSortOrder('recent'); setPersonFilter('전체'); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.filterResetText}>초기화</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.datePickerBody}>
-            {/* Year */}
-            <View style={styles.dateCol}>
-              <TouchableOpacity onPress={() => setYear(y => y - 1)}>
-                <Ionicons name="chevron-up" size={20} color={colors.textSecondary} />
+
+          <Text style={styles.filterSectionLabel}>정렬</Text>
+          <View style={styles.filterChipRow}>
+            {([
+              { key: 'recent', label: '최신순' },
+              { key: 'high',   label: '최고금액순' },
+              { key: 'low',    label: '최저금액순' },
+            ] as const).map(({ key, label }) => (
+              <TouchableOpacity
+                key={key}
+                style={[styles.filterChip, sortOrder === key && styles.filterChipActive]}
+                onPress={() => setSortOrder(key)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.filterChipText, sortOrder === key && styles.filterChipTextActive]}>{label}</Text>
               </TouchableOpacity>
-              <View style={styles.dateSelBox}>
-                <Text style={styles.dateSelText}>{year}</Text>
-              </View>
-              <TouchableOpacity onPress={() => setYear(y => y + 1)}>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <Text style={styles.dateUnit}>년</Text>
-            </View>
-            {/* Month */}
-            <View style={styles.dateCol}>
-              <TouchableOpacity onPress={() => setMonth(m => m > 1 ? m - 1 : 12)}>
-                <Ionicons name="chevron-up" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <View style={styles.dateSelBox}>
-                <Text style={styles.dateSelText}>{month}</Text>
-              </View>
-              <TouchableOpacity onPress={() => setMonth(m => m < 12 ? m + 1 : 1)}>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <Text style={styles.dateUnit}>월</Text>
-            </View>
+            ))}
           </View>
-          <TouchableOpacity style={styles.dateConfirmBtn} onPress={() => setShowDatePicker(false)} activeOpacity={0.85}>
-            <Text style={styles.dateConfirmText}>확인</Text>
+
+          <Text style={styles.filterSectionLabel}>대상</Text>
+          <View style={styles.filterChipRow}>
+            {(['전체', '나', '파트너'] as const).map((p) => (
+              <TouchableOpacity
+                key={p}
+                style={[styles.filterChip, personFilter === p && styles.filterChipActive]}
+                onPress={() => setPersonFilter(p)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.filterChipText, personFilter === p && styles.filterChipTextActive]}>{p}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity style={styles.filterConfirmBtn} onPress={() => setShowFilterSheet(false)} activeOpacity={0.85}>
+            <Text style={styles.filterConfirmText}>적용</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Edit Transaction Bottom Sheet */}
+      <Modal visible={!!editTx} animationType="slide" transparent onRequestClose={() => setEditTx(null)}>
+        <KeyboardAvoidingView style={styles.editModalWrap} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setEditTx(null)} />
+          {editTx && (
+            <View style={[styles.editSheet, { paddingBottom: insets.bottom + 16 }]}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.editHeader}>
+                <Text style={styles.editTitle}>내역 수정</Text>
+                <TouchableOpacity onPress={() => setEditTx(null)}>
+                  <Ionicons name="close" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* 금액 */}
+              <Text style={styles.editLabel}>금액</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editAmount}
+                onChangeText={(v) => setEditAmount(v.replace(/[^0-9]/g, ''))}
+                keyboardType="numeric"
+                placeholder="금액 입력"
+                placeholderTextColor={colors.inactive}
+              />
+
+              {/* 메모 */}
+              <Text style={styles.editLabel}>메모</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editMemo}
+                onChangeText={setEditMemo}
+                placeholder="메모 입력"
+                placeholderTextColor={colors.inactive}
+              />
+
+              {/* 시간대 */}
+              <Text style={styles.editLabel}>시간대</Text>
+              <View style={styles.timeRow}>
+                {TIME_SLOTS.map((t) => (
+                  <TouchableOpacity
+                    key={t}
+                    style={[styles.timeChip, editTime === t && styles.timeChipActive]}
+                    onPress={() => setEditTime(t)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.timeChipText, editTime === t && styles.timeChipTextActive]}>
+                      {TIME_EMOJI[t]} {t}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* 저장 */}
+              <TouchableOpacity
+                style={styles.editSaveBtn}
+                activeOpacity={0.85}
+                onPress={async () => {
+                  const amt = parseInt(editAmount, 10);
+                  if (!amt || amt <= 0) { Alert.alert('알림', '올바른 금액을 입력해주세요.'); return; }
+                  await updateTransaction(editTx.id, { amount: amt, memo: editMemo, time: editTime });
+                  setEditTx(null);
+                  Alert.alert('수정 완료', '내역이 수정되었습니다.');
+                }}
+              >
+                <Text style={styles.editSaveBtnText}>저장하기</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <PhotoViewerModal uri={viewPhotoUri} onClose={() => setViewPhotoUri(null)} />
+
+      {/* Date Picker Bottom Sheet */}
+      <Modal visible={showDatePicker} animationType="slide" transparent onRequestClose={() => setShowDatePicker(false)}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
+        <View style={styles.ymSheet}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.ymHeader}>
+            <Text style={styles.ymTitle}>날짜 선택</Text>
+            <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+              <Ionicons name="close" size={18} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.ymDivider} />
+          <View style={styles.ymPickerRow}>
+            <WheelPicker
+              items={YEARS}
+              selectedIndex={pickYearIdx}
+              onSelect={setPickYearIdx}
+            />
+            <WheelPicker
+              items={MONTHS}
+              selectedIndex={pickMonthIdx}
+              onSelect={setPickMonthIdx}
+              format={(v) => `${v}월`}
+            />
+          </View>
+          <TouchableOpacity
+            style={styles.ymConfirmBtn}
+            onPress={() => {
+              setYear(YEARS[pickYearIdx]);
+              setMonth(MONTHS[pickMonthIdx]);
+              setShowDatePicker(false);
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.ymConfirmText}>확인</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -265,6 +529,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
   headerTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.text },
   iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
+  iconBtnActive: { backgroundColor: colors.primary },
+  filterBadge: { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF6B6B' },
 
   filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingBottom: 8 },
   chip: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 100, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
@@ -274,6 +540,7 @@ const styles = StyleSheet.create({
 
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, paddingVertical: 6 },
   navBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  monthBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.canvas },
   monthLabel: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
 
   summaryBar: { flexDirection: 'row', backgroundColor: colors.card, marginHorizontal: 20, borderRadius: 14, padding: 14, marginVertical: 8 },
@@ -283,6 +550,8 @@ const styles = StyleSheet.create({
   summaryDivider: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
 
   list: { flex: 1, paddingHorizontal: 20 },
+  emptyWrap: { alignItems: 'center', gap: 12, paddingTop: 60 },
+  emptyText: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted },
   dateHeader: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.text, paddingVertical: 8 },
   txRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   txIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
@@ -320,6 +589,14 @@ const styles = StyleSheet.create({
   memoSec: { gap: 4, marginBottom: 14 },
   memoLbl: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   memoTxt: { fontFamily: fonts.regular, fontSize: 15, color: colors.text },
+  photoSec: { gap: 8, marginBottom: 14 },
+  txPhoto: { width: '100%', height: 180, borderRadius: 12 },
+  photoExpandBtn: {
+    position: 'absolute', bottom: 8, right: 8,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   actionRow: { flexDirection: 'row', gap: 12 },
   editBtn: { flex: 1, height: 48, borderRadius: 12, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   editBtnText: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },
@@ -328,19 +605,42 @@ const styles = StyleSheet.create({
   viewOnlyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 },
   viewOnlyText: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted },
 
-  // --- Date picker ---
-  datePicker: {
-    position: 'absolute', top: '30%', left: '10%', right: '10%',
-    backgroundColor: colors.card, borderRadius: 20, padding: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
-  },
-  datePickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  datePickerTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
-  datePickerBody: { flexDirection: 'row', justifyContent: 'center', gap: 24, marginBottom: 20 },
-  dateCol: { alignItems: 'center', gap: 8 },
-  dateUnit: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary },
-  dateSelBox: { width: 80, height: 44, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  dateSelText: { fontFamily: fonts.bold, fontSize: 18, color: '#FFFFFF' },
-  dateConfirmBtn: { backgroundColor: colors.primary, borderRadius: 100, height: 48, alignItems: 'center', justifyContent: 'center' },
-  dateConfirmText: { fontFamily: fonts.semiBold, fontSize: 15, color: '#FFFFFF' },
+  // --- Date picker bottom sheet ---
+  ymSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32 },
+  ymHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, paddingHorizontal: 20 },
+  ymTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
+  ymDivider: { height: 1, backgroundColor: colors.border },
+  ymPickerRow: { flexDirection: 'row', height: ITEM_H * 5, marginTop: 8 },
+  ymConfirmBtn: { marginHorizontal: 20, marginTop: 16, backgroundColor: colors.primary, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
+  ymConfirmText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
+
+  // --- Filter bottom sheet ---
+  filterSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20 },
+  filterSheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 52 },
+  filterSheetTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
+  filterResetText: { fontFamily: fonts.medium, fontSize: 13, color: colors.primary },
+  filterSectionLabel: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textSecondary, marginBottom: 10, marginTop: 16 },
+  filterChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterChip: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 100, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.border },
+  filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterChipText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  filterChipTextActive: { color: '#FFFFFF', fontFamily: fonts.semiBold },
+  filterConfirmBtn: { marginTop: 24, backgroundColor: colors.primary, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
+  filterConfirmText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
+
+  // --- Edit sheet ---
+  editModalWrap: { flex: 1, justifyContent: 'flex-end' },
+  editSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
+  editHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, marginBottom: 4 },
+  editTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
+  editLabel: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textSecondary, marginBottom: 8, marginTop: 14 },
+  editInput: { backgroundColor: colors.canvas, borderRadius: 12, borderWidth: 1, borderColor: colors.border, height: 48, paddingHorizontal: 14, fontFamily: fonts.regular, fontSize: 15, color: colors.text },
+  editSaveBtn: { marginTop: 20, backgroundColor: colors.primary, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
+  editSaveBtnText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
+
+  // --- Wheel picker ---
+  wheelOuter: { flex: 1, overflow: 'hidden' },
+  wheelItem: { height: ITEM_H, alignItems: 'center', justifyContent: 'center', marginHorizontal: 8 },
+  wheelItemSelected: { backgroundColor: colors.primary, borderRadius: 12 },
+  wheelText: { color: colors.text },
 });

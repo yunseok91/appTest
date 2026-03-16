@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
   Modal, FlatList, TextInput, Image,
@@ -9,31 +9,63 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts } from '../theme/colors';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, type Category } from '../config/categoryIcons';
+import { useTransactions } from '../context/TransactionContext';
+import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../context/ProfileContext';
 
 type TimeSlot = 'morning' | 'lunch' | 'evening';
 type TabType = 'expense' | 'income';
 type PayMethod = 'cash' | 'card';
 
-type Card = { id: string; name: string; last4: string; color: string };
+type Notification = { id: string; message: string; time: string; read: boolean };
 
-const MOCK_CARDS: Card[] = [
-  { id: '1', name: '신한카드', last4: '1234', color: '#0046B0' },
-  { id: '2', name: '국민카드', last4: '5678', color: '#FFB300' },
-  { id: '3', name: '카카오뱅크', last4: '9012', color: '#3A1D96' },
+const MOCK_NOTIFICATIONS: Notification[] = [
+  { id: '1', message: '준호님이 저녁 식비 ₩32,000을 기록했습니다', time: '방금 전', read: false },
+  { id: '2', message: '민지님이 카페 ₩6,500을 기록했습니다', time: '1시간 전', read: false },
+  { id: '3', message: '이번 달 예산의 80%를 사용했어요', time: '오늘', read: true },
 ];
 
-const MONTHLY_BUDGET = 1_200_000;
-const MONTHLY_SPEND  = 1_015_000;
-const MONTHLY_INCOME = 2_300_000;
-const MONTHLY_BALANCE = MONTHLY_INCOME - MONTHLY_SPEND;
-const isOverBudget = MONTHLY_SPEND > MONTHLY_BUDGET;
+type Card = { id: string; name: string; color: string };
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
+function getKoreanTimeSlot(): TimeSlot {
+  const now = new Date();
+  const koHour = new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCHours();
+  if (koHour >= 6 && koHour < 12) return 'morning';
+  if (koHour >= 12 && koHour < 18) return 'lunch';
+  return 'evening';
+}
+
+const TIME_LABEL: Record<TimeSlot, '아침' | '점심' | '저녁'> = {
+  morning: '아침', lunch: '점심', evening: '저녁',
+};
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { addTransaction, transactions } = useTransactions();
+  const { user, householdName } = useAuth();
+  const { budget, cards: profileCards } = useProfile();
 
-  const [timeSlot, setTimeSlot] = useState<TimeSlot>('morning');
+  // Map profile cards to local Card type (memoized to avoid effect loop)
+  const cards = useMemo<Card[]>(
+    () => profileCards.map(c => ({ id: c.id, name: c.alias, color: c.color })),
+    [profileCards],
+  );
+
+  // Calculate real monthly income / expense
+  const now = new Date();
+  const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthlyExpense = transactions
+    .filter(tx => tx.type === 'expense' && tx.date.startsWith(monthStr))
+    .reduce((s, tx) => s + tx.amount, 0);
+  const monthlyIncome = transactions
+    .filter(tx => tx.type === 'income' && tx.date.startsWith(monthStr))
+    .reduce((s, tx) => s + tx.amount, 0);
+  const monthlyBalance = monthlyIncome - monthlyExpense;
+  const isOverBudget = monthlyExpense > budget;
+
+  const [timeSlot, setTimeSlot] = useState<TimeSlot>(getKoreanTimeSlot);
   const [tab, setTab] = useState<TabType>('expense');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [amount, setAmount] = useState('');
@@ -41,11 +73,22 @@ export default function HomeScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   const [payMethod, setPayMethod] = useState<PayMethod>('cash');
-  const [selectedCard, setSelectedCard] = useState<Card>(MOCK_CARDS[0]);
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+
+  // Sync selectedCard when profile cards update
+  React.useEffect(() => {
+    setSelectedCard(prev => {
+      if (prev && cards.some(c => c.id === prev.id)) return prev;
+      return cards[0] ?? null;
+    });
+  }, [cards]);
 
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCardPicker, setShowCardPicker] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const [selectedDate, setSelectedDate] = useState(new Date(2026, 2, 14));
   const [pickerDate, setPickerDate] = useState(new Date(2026, 2, 1));
@@ -106,9 +149,16 @@ export default function HomeScreen() {
                 <Text style={styles.relChipEmoji}>💑</Text>
                 <Text style={styles.relChipText}>연인</Text>
               </View>
-              <Text style={styles.coupleName}>민지 &amp; 준호</Text>
+              <Text style={styles.coupleName}>{householdName}</Text>
             </View>
-            <Ionicons name="notifications-outline" size={22} color={colors.text} />
+            <TouchableOpacity onPress={() => setShowNotifications(true)} activeOpacity={0.7} style={{ position: 'relative' }}>
+              <Ionicons name="notifications-outline" size={22} color={colors.text} />
+              {unreadCount > 0 && (
+                <View style={styles.notiiBadge}>
+                  <Text style={styles.notiiBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
 
           {/* Avatar row */}
@@ -129,7 +179,7 @@ export default function HomeScreen() {
             <Text style={styles.balLbl}>이번 달 잔액</Text>
             <View style={styles.balAmtRow}>
               <Text style={[styles.balAmt, isOverBudget && { color: colors.secondary }]}>
-                ₩{MONTHLY_BALANCE.toLocaleString()}
+                ₩{monthlyBalance.toLocaleString()}
               </Text>
               {isOverBudget && (
                 <View style={styles.overBudgetBubble}>
@@ -141,12 +191,12 @@ export default function HomeScreen() {
             <View style={styles.statRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statLbl}>수입</Text>
-                <Text style={[styles.statVal, { color: colors.primary }]}>₩{MONTHLY_INCOME.toLocaleString()}</Text>
+                <Text style={[styles.statVal, { color: colors.primary }]}>₩{monthlyIncome.toLocaleString()}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statLbl}>지출</Text>
-                <Text style={[styles.statVal, { color: colors.secondary }]}>₩{MONTHLY_SPEND.toLocaleString()}</Text>
+                <Text style={[styles.statVal, { color: colors.secondary }]}>₩{monthlyExpense.toLocaleString()}</Text>
               </View>
             </View>
           </View>
@@ -217,8 +267,14 @@ export default function HomeScreen() {
                 onPress={() => setShowCardPicker(true)}
                 activeOpacity={0.8}
               >
-                <View style={[styles.cardDot, { backgroundColor: selectedCard.color }]} />
-                <Text style={styles.cardSelectorText}>{selectedCard.name} ****{selectedCard.last4}</Text>
+                {selectedCard ? (
+                  <>
+                    <View style={[styles.cardDot, { backgroundColor: selectedCard.color }]} />
+                    <Text style={styles.cardSelectorText}>{selectedCard.name}</Text>
+                  </>
+                ) : (
+                  <Text style={[styles.cardSelectorText, { color: colors.inactive }]}>카드를 선택하세요</Text>
+                )}
                 <Ionicons name="chevron-down" size={14} color={colors.inactive} />
               </TouchableOpacity>
             )}
@@ -301,7 +357,38 @@ export default function HomeScreen() {
                   </>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={[styles.saveBtn, (!amount || !selectedCategory) && { opacity: 0.4 }]}
+                activeOpacity={0.85}
+                disabled={!amount || !selectedCategory}
+                onPress={async () => {
+                  if (!amount || !selectedCategory) return;
+                  const y = selectedDate.getFullYear();
+                  const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                  const d = String(selectedDate.getDate()).padStart(2, '0');
+                  await addTransaction({
+                    type: tab === 'expense' ? 'expense' : 'income',
+                    category: selectedCategory.label,
+                    categoryKey: selectedCategory.key,
+                    categoryIcon: selectedCategory.icon,
+                    categoryIconColor: selectedCategory.iconColor,
+                    categoryBgColor: selectedCategory.bgColor,
+                    amount: Number(amount),
+                    memo,
+                    date: `${y}-${m}-${d}`,
+                    time: TIME_LABEL[timeSlot],
+                    person: user?.name ?? '나',
+                    payMethod,
+                    cardName: payMethod === 'card' ? selectedCard?.name : undefined,
+                    photoUri: photoUri ?? undefined,
+                  });
+                  setAmount('');
+                  setMemo('');
+                  setPhotoUri(null);
+                  setSelectedCategory(null);
+                  Alert.alert('저장했습니다', '내역이 성공적으로 저장되었습니다.');
+                }}
+              >
                 <Ionicons name="checkmark" size={16} color={colors.white} />
                 <Text style={styles.saveBtnText}>저장하기</Text>
               </TouchableOpacity>
@@ -349,25 +436,67 @@ export default function HomeScreen() {
         <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>카드 선택</Text>
-          {MOCK_CARDS.map((card) => (
-            <TouchableOpacity
-              key={card.id}
-              style={[styles.cardPickerItem, selectedCard.id === card.id && styles.cardPickerItemActive]}
-              onPress={() => { setSelectedCard(card); setShowCardPicker(false); }}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.cardPickerIcon, { backgroundColor: card.color }]}>
-                <Ionicons name="card" size={16} color="#fff" />
-              </View>
-              <View style={styles.cardPickerMeta}>
-                <Text style={styles.cardPickerName}>{card.name}</Text>
-                <Text style={styles.cardPickerNum}>****{card.last4}</Text>
-              </View>
-              {selectedCard.id === card.id && (
-                <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
+          {cards.length === 0 ? (
+            <Text style={[styles.cardPickerName, { color: colors.textMuted, textAlign: 'center', paddingVertical: 20 }]}>
+              마이페이지에서 카드를 추가해 주세요
+            </Text>
+          ) : (
+            cards.map((card) => (
+              <TouchableOpacity
+                key={card.id}
+                style={[styles.cardPickerItem, selectedCard?.id === card.id && styles.cardPickerItemActive]}
+                onPress={() => { setSelectedCard(card); setShowCardPicker(false); }}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.cardPickerIcon, { backgroundColor: card.color }]}>
+                  <Ionicons name="card" size={16} color="#fff" />
+                </View>
+                <View style={styles.cardPickerMeta}>
+                  <Text style={styles.cardPickerName}>{card.name}</Text>
+                </View>
+                {selectedCard?.id === card.id && (
+                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+      </Modal>
+
+      {/* 알림 팝업 */}
+      <Modal visible={showNotifications} animationType="slide" transparent onRequestClose={() => setShowNotifications(false)}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowNotifications(false)} />
+        <View style={[styles.notiiSheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.notiiHeader}>
+            <Text style={styles.notiiTitle}>알림</Text>
+            {unreadCount > 0 && (
+              <TouchableOpacity onPress={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))} activeOpacity={0.7}>
+                <Text style={styles.notiiReadAll}>모두 읽음</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {notifications.length === 0 ? (
+            <View style={styles.notiiEmpty}>
+              <Ionicons name="notifications-off-outline" size={36} color={colors.border} />
+              <Text style={styles.notiiEmptyText}>새로운 알림이 없어요</Text>
+            </View>
+          ) : (
+            notifications.map((n) => (
+              <TouchableOpacity
+                key={n.id}
+                style={[styles.notiiItem, !n.read && styles.notiiItemUnread]}
+                activeOpacity={0.7}
+                onPress={() => setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))}
+              >
+                <View style={[styles.notiiDot, { backgroundColor: n.read ? colors.border : colors.primary }]} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[styles.notiiMsg, !n.read && { fontFamily: fonts.semiBold }]}>{n.message}</Text>
+                  <Text style={styles.notiiTime}>{n.time}</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
       </Modal>
 
@@ -531,14 +660,14 @@ const styles = StyleSheet.create({
   cardPickerNum: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
 
   // 금액 입력
-  amountSection: { gap: 0, paddingVertical: 4 },
-  amountHint: { fontFamily: fonts.regular, fontSize: 11, color: colors.inactive, marginBottom: 2 },
-  amountInputRow: { flexDirection: 'row', alignItems: 'center' },
+  amountSection: { gap: 4, paddingTop: 10, paddingBottom: 6 },
+  amountHint: { fontFamily: fonts.regular, fontSize: 12, color: colors.inactive },
+  amountInputRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   amountPrefix: { fontFamily: fonts.bold, fontSize: 34, color: colors.text, marginRight: 2, letterSpacing: -1 },
   amountInput: {
     flex: 1,
     fontFamily: fonts.bold, fontSize: 34, color: colors.text,
-    letterSpacing: -1, padding: 0, includeFontPadding: false,
+    letterSpacing: -1, paddingHorizontal: 0, paddingVertical: 4, textAlignVertical: 'center',
   },
 
   cardDivider: { height: 1, backgroundColor: colors.border },
@@ -619,4 +748,21 @@ const styles = StyleSheet.create({
   calDaySelected: { backgroundColor: colors.primary },
   calDayNum: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.text },
   calDayNumSelected: { color: colors.white },
+
+  // 알림 배지
+  notiiBadge: { position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  notiiBadgeText: { fontFamily: fonts.bold, fontSize: 10, color: '#FFFFFF' },
+
+  // 알림 시트
+  notiiSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
+  notiiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 44, marginBottom: 4 },
+  notiiTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
+  notiiReadAll: { fontFamily: fonts.medium, fontSize: 13, color: colors.primary },
+  notiiEmpty: { alignItems: 'center', gap: 10, paddingVertical: 40 },
+  notiiEmptyText: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted },
+  notiiItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  notiiItemUnread: { backgroundColor: '#F8FFF9', marginHorizontal: -20, paddingHorizontal: 20 },
+  notiiDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
+  notiiMsg: { fontFamily: fonts.regular, fontSize: 14, color: colors.text, lineHeight: 20 },
+  notiiTime: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
 });

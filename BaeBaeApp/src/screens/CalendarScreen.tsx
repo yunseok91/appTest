@@ -1,64 +1,79 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
-  Modal, ScrollView, Alert,
+  Modal, ScrollView, Alert, TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
+
+const ITEM_H = 48;
+const YEARS = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030];
+const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+function WheelPicker({ items, selectedIndex, onSelect, format }: {
+  items: number[];
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+  format?: (v: number) => string;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
+  const label = format ?? ((v: number) => String(v));
+
+  useEffect(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
+    }, 50);
+  }, [selectedIndex]);
+
+  const handleSnap = (e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
+    const clamped = Math.max(0, Math.min(idx, items.length - 1));
+    onSelect(clamped);
+  };
+
+  return (
+    <View style={styles.wheelOuter}>
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_H}
+        decelerationRate="fast"
+        nestedScrollEnabled
+        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
+        onMomentumScrollEnd={handleSnap}
+        onScrollEndDrag={handleSnap}
+      >
+        {items.map((v, i) => {
+          const dist = Math.abs(i - selectedIndex);
+          const isSelected = dist === 0;
+          const opacity = dist === 0 ? 1 : dist === 1 ? 0.55 : 0.25;
+          const fontSize = dist === 0 ? 17 : dist === 1 ? 15 : 13;
+          const fontWeight = dist === 0 ? fonts.bold : fonts.regular;
+          return (
+            <View key={v} style={[styles.wheelItem, isSelected && styles.wheelItemSelected]}>
+              <Text style={[styles.wheelText, {
+                opacity, fontSize, fontFamily: fontWeight,
+                color: isSelected ? '#FFFFFF' : colors.text,
+              }]}>
+                {label(v)}
+              </Text>
+            </View>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../theme/colors';
-import { EXPENSE_CATEGORIES } from '../config/categoryIcons';
+import { useTransactions, type Transaction } from '../context/TransactionContext';
 
-const ME = 'minji'; // 로그인 사용자
+type TimeSlot = '아침' | '점심' | '저녁';
+const TIME_SLOTS: TimeSlot[] = ['아침', '점심', '저녁'];
+const TIME_EMOJI: Record<TimeSlot, string> = { 아침: '🌅', 점심: '☀️', 저녁: '🌙' };
+import { useAuth } from '../context/AuthContext';
+import PhotoViewerModal from '../components/PhotoViewerModal';
 
-type Person = 'all' | 'minji' | 'junho';
-
-type Transaction = {
-  id: string;
-  person: 'minji' | 'junho';
-  amount: number;
-  category: string;
-  memo: string;
-};
-
-type DayData = {
-  minji: number;   // 총 지출 (빨강)
-  junho: number;   // 총 지출 (파랑)
-  transactions: Transaction[];
-};
-
-// Mock data (2026년 3월)
-const MOCK: Record<string, DayData> = {
-  '2026-03-01': { minji: 12000, junho: 0, transactions: [{ id:'1', person:'minji', amount:12000, category:'식비', memo:'스타벅스' }] },
-  '2026-03-03': { minji: 45000, junho: 32000, transactions: [
-    { id:'2', person:'minji', amount:45000, category:'쇼핑', memo:'올리브영' },
-    { id:'3', person:'junho', amount:32000, category:'식비', memo:'저녁 치킨' },
-  ]},
-  '2026-03-05': { minji: 0, junho: 8500, transactions: [{ id:'4', person:'junho', amount:8500, category:'교통', memo:'지하철 충전' }] },
-  '2026-03-07': { minji: 78000, junho: 0, transactions: [{ id:'5', person:'minji', amount:78000, category:'미용/관리', memo:'헤어 커트' }] },
-  '2026-03-10': { minji: 15000, junho: 55000, transactions: [
-    { id:'6', person:'minji', amount:15000, category:'식비', memo:'점심 혼밥' },
-    { id:'7', person:'junho', amount:55000, category:'문화/여가', memo:'영화+팝콘' },
-  ]},
-  '2026-03-13': { minji: 23000, junho: 12000, transactions: [
-    { id:'8', person:'minji', amount:23000, category:'식비', memo:'카페 디저트' },
-    { id:'9', person:'junho', amount:12000, category:'식비', memo:'편의점' },
-  ]},
-  '2026-03-14': { minji: 120000, junho: 68000, transactions: [
-    { id:'10', person:'minji', amount:120000, category:'쇼핑', memo:'옷 구매' },
-    { id:'11', person:'junho', amount:68000, category:'식비', memo:'데이트 저녁' },
-  ]},
-  '2026-03-17': { minji: 0, junho: 35000, transactions: [{ id:'12', person:'junho', amount:35000, category:'운동', memo:'헬스장 1개월' }] },
-  '2026-03-20': { minji: 9800, junho: 0, transactions: [{ id:'13', person:'minji', amount:9800, category:'교통', memo:'택시' }] },
-  '2026-03-22': { minji: 44000, junho: 44000, transactions: [
-    { id:'14', person:'minji', amount:44000, category:'식비', memo:'한식 외식' },
-    { id:'15', person:'junho', amount:44000, category:'식비', memo:'한식 외식' },
-  ]},
-  '2026-03-25': { minji: 15000, junho: 8000, transactions: [
-    { id:'16', person:'minji', amount:15000, category:'통신', memo:'앱 구독' },
-    { id:'17', person:'junho', amount:8000, category:'식비', memo:'아이스크림' },
-  ]},
-  '2026-03-28': { minji: 62000, junho: 0, transactions: [{ id:'18', person:'minji', amount:62000, category:'선물/경조사', memo:'친구 생일 선물' }] },
-};
+type PersonFilter = 'all' | 'me' | 'partner';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -70,25 +85,42 @@ function formatW(amount: number) {
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
-  const today = new Date(2026, 2, 14); // 2026-03-14
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1));
-  const [filter, setFilter] = useState<Person>('all');
+  const { transactions, deleteTransaction, updateTransaction } = useTransactions();
+  const { user } = useAuth();
+  const myName = user?.name ?? '나';
+
+  const today = new Date();
+  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [filter, setFilter] = useState<PersonFilter>('all');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [editTx, setEditTx] = useState<Transaction | null>(null);
+  const [viewPhotoUri, setViewPhotoUri] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editMemo, setEditMemo] = useState('');
+  const [editTime, setEditTime] = useState<TimeSlot>('아침');
   const [showYMPicker, setShowYMPicker] = useState(false);
-  const [pickYear, setPickYear] = useState(2026);
-  const [pickMonth, setPickMonth] = useState(3);
+  const [pickYearIdx, setPickYearIdx] = useState(YEARS.indexOf(today.getFullYear()));
+  const [pickMonthIdx, setPickMonthIdx] = useState(today.getMonth());
 
   const year = currentDate.getFullYear();
-  const month = currentDate.getMonth(); // 0-based
+  const month = currentDate.getMonth();
 
-  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
 
   const dateKey = (day: number) => `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+  const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+  // 이번 달 지출 거래만 추출
+  const monthlyExpenses = useMemo(() =>
+    transactions.filter(tx => tx.type === 'expense' && tx.date.startsWith(monthStr)),
+    [transactions, monthStr]
+  );
 
   const cells = useMemo(() => {
     const arr: (number | null)[] = Array(firstDay).fill(null);
@@ -97,18 +129,28 @@ export default function CalendarScreen() {
     return arr;
   }, [firstDay, daysInMonth]);
 
-  const dayTotal = (day: number): number => {
-    const data = MOCK[dateKey(day)];
-    if (!data) return 0;
-    if (filter === 'minji') return data.minji;
-    if (filter === 'junho') return data.junho;
-    return data.minji + data.junho;
+  const dayTransactions = (day: number): Transaction[] => {
+    const key = dateKey(day);
+    return monthlyExpenses.filter(tx => {
+      if (tx.date !== key) return false;
+      if (filter === 'me') return tx.person === myName;
+      if (filter === 'partner') return tx.person !== myName;
+      return true;
+    });
   };
 
-  const selectedData = selectedDay ? MOCK[selectedDay] : null;
-  const filteredTx = selectedData?.transactions.filter(tx =>
-    filter === 'all' || tx.person === filter
-  ) ?? [];
+  const dayTotal = (day: number) =>
+    dayTransactions(day).reduce((s, t) => s + t.amount, 0);
+
+  const filteredTx = selectedDay ? monthlyExpenses.filter(tx => {
+    if (tx.date !== selectedDay) return false;
+    if (filter === 'me') return tx.person === myName;
+    if (filter === 'partner') return tx.person !== myName;
+    return true;
+  }) : [];
+
+  const hasMe = (day: number) => dayTransactions(day).some(t => t.person === myName);
+  const hasPartner = (day: number) => dayTransactions(day).some(t => t.person !== myName);
 
   const isToday = (day: number) =>
     today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
@@ -124,7 +166,7 @@ export default function CalendarScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.monthTitleBtn}
-          onPress={() => { setPickYear(year); setPickMonth(month + 1); setShowYMPicker(true); }}
+          onPress={() => { setPickYearIdx(YEARS.indexOf(year)); setPickMonthIdx(month); setShowYMPicker(true); }}
           activeOpacity={0.8}
         >
           <Text style={styles.monthTitle}>{year}년 {month + 1}월</Text>
@@ -137,7 +179,7 @@ export default function CalendarScreen() {
 
       {/* Filter chips */}
       <View style={styles.filterRow}>
-        {([['all', '전체'], ['minji', '민지'], ['junho', '준호']] as [Person, string][]).map(([key, label]) => (
+        {([['all', '전체'], ['me', '나'], ['partner', '파트너']] as [PersonFilter, string][]).map(([key, label]) => (
           <TouchableOpacity
             key={key}
             style={[styles.filterChip, filter === key && filterChipActive(key)]}
@@ -145,9 +187,13 @@ export default function CalendarScreen() {
             activeOpacity={0.8}
           >
             {key !== 'all' && (
-              <View style={[styles.dot, { backgroundColor: key === 'minji' ? '#C4729A' : '#4A90D9' }]} />
+              <View style={[styles.dot, { backgroundColor: key === 'me' ? '#C4729A' : '#4A90D9' }]} />
             )}
-            <Text style={[styles.filterText, filter === key && styles.filterTextActive]}>{label}</Text>
+            <Text style={[
+              styles.filterText,
+              filter === key && { fontFamily: fonts.semiBold,
+                color: key === 'all' ? '#FFFFFF' : key === 'me' ? '#C4729A' : '#4A90D9' },
+            ]}>{label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -165,16 +211,16 @@ export default function CalendarScreen() {
           {cells.map((day, idx) => {
             if (!day) return <View key={`e-${idx}`} style={styles.cell} />;
             const key = dateKey(day);
-            const data = MOCK[key];
             const total = dayTotal(day);
             const colIdx = idx % 7;
+            const hasTx = total > 0;
 
             return (
               <TouchableOpacity
                 key={key}
                 style={[styles.cell, isToday(day) && styles.cellToday]}
-                onPress={() => data && setSelectedDay(key)}
-                activeOpacity={data ? 0.7 : 1}
+                onPress={() => hasTx && setSelectedDay(key)}
+                activeOpacity={hasTx ? 0.7 : 1}
               >
                 <Text style={[
                   styles.dayNum,
@@ -185,12 +231,12 @@ export default function CalendarScreen() {
                 {total > 0 && (
                   <Text style={styles.dayTotal}>{formatW(total)}</Text>
                 )}
-                {data && (
+                {hasTx && (
                   <View style={styles.dotRow}>
-                    {(filter === 'all' || filter === 'minji') && data.minji > 0 && (
+                    {(filter === 'all' || filter === 'me') && hasMe(day) && (
                       <View style={[styles.personDot, { backgroundColor: '#C4729A' }]} />
                     )}
-                    {(filter === 'all' || filter === 'junho') && data.junho > 0 && (
+                    {(filter === 'all' || filter === 'partner') && hasPartner(day) && (
                       <View style={[styles.personDot, { backgroundColor: '#4A90D9' }]} />
                     )}
                   </View>
@@ -214,18 +260,21 @@ export default function CalendarScreen() {
               {filteredTx.length === 0 ? (
                 <Text style={styles.emptyText}>해당 조건의 내역이 없습니다</Text>
               ) : (
-                filteredTx.map((tx) => (
+                filteredTx.map((tx) => {
+                  const isMe = tx.person === myName;
+                  return (
                   <TouchableOpacity
                     key={tx.id}
                     style={styles.txRow}
                     activeOpacity={0.7}
-                    onPress={() => { setSelectedTx(tx); }}
+                    onPress={() => {
+                      setSelectedDay(null);
+                      setSelectedTx(tx);
+                    }}
                   >
-                    <View style={[styles.personBadge, { backgroundColor: tx.person === 'minji' ? '#FDF0F6' : '#EBF0FF' }]}>
-                      <View style={[styles.dot, { backgroundColor: tx.person === 'minji' ? '#C4729A' : '#4A90D9' }]} />
-                      <Text style={[styles.personName, { color: tx.person === 'minji' ? '#C4729A' : '#4A90D9' }]}>
-                        {tx.person === 'minji' ? '민지' : '준호'}
-                      </Text>
+                    <View style={[styles.personBadge, { backgroundColor: isMe ? '#FDF0F6' : '#EBF0FF' }]}>
+                      <View style={[styles.dot, { backgroundColor: isMe ? '#C4729A' : '#4A90D9' }]} />
+                      <Text style={[styles.personName, { color: isMe ? '#C4729A' : '#4A90D9' }]}>{tx.person}</Text>
                     </View>
                     <View style={styles.txMeta}>
                       <Text style={styles.txCategory}>{tx.category}</Text>
@@ -236,7 +285,8 @@ export default function CalendarScreen() {
                       <Ionicons name="chevron-forward" size={14} color={colors.inactive} />
                     </View>
                   </TouchableOpacity>
-                ))
+                  );
+                })
               )}
               <View style={styles.sheetTotal}>
                 <Text style={styles.sheetTotalLabel}>합계</Text>
@@ -253,19 +303,18 @@ export default function CalendarScreen() {
       <Modal visible={!!selectedTx} animationType="slide" transparent onRequestClose={() => setSelectedTx(null)}>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setSelectedTx(null)} />
         {selectedTx && (() => {
-          const catInfo = EXPENSE_CATEGORIES.find(c => c.label === selectedTx.category);
-          const isMe = selectedTx.person === ME;
-          const personColor = selectedTx.person === 'minji' ? '#C4729A' : '#4A90D9';
-          const personBg = selectedTx.person === 'minji' ? '#FDF0F6' : '#EBF0FF';
+          const isMe = selectedTx.person === myName;
+          const personColor = isMe ? '#C4729A' : '#4A90D9';
+          const personBg = isMe ? '#FDF0F6' : '#EBF0FF';
           return (
             <View style={[styles.detailSheet, { paddingBottom: insets.bottom + 16 }]}>
               <View style={styles.sheetHandle} />
 
               {/* 헤더: 카테고리 칩 + 닫기 */}
               <View style={styles.detailHeader}>
-                <View style={[styles.catChip, { backgroundColor: catInfo?.bgColor ?? colors.canvas }]}>
-                  <Ionicons name={(catInfo?.icon ?? 'ellipsis-horizontal-outline') as any} size={14} color={catInfo?.iconColor ?? colors.textSecondary} />
-                  <Text style={[styles.catChipText, { color: catInfo?.iconColor ?? colors.textSecondary }]}>{selectedTx.category}</Text>
+                <View style={[styles.catChip, { backgroundColor: selectedTx.categoryBgColor }]}>
+                  <Ionicons name={selectedTx.categoryIcon as any} size={14} color={selectedTx.categoryIconColor} />
+                  <Text style={[styles.catChipText, { color: selectedTx.categoryIconColor }]}>{selectedTx.category}</Text>
                 </View>
                 <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedTx(null)}>
                   <Ionicons name="close" size={16} color={colors.textSecondary} />
@@ -290,6 +339,25 @@ export default function CalendarScreen() {
                 <Text style={styles.detailMemoText}>{selectedTx.memo || '메모 없음'}</Text>
               </View>
 
+              {selectedTx.photoUri && (
+                <>
+                  <View style={styles.detailDivider} />
+                  <TouchableOpacity
+                    onPress={() => {
+                      const uri = selectedTx.photoUri!;
+                      setSelectedTx(null);
+                      setViewPhotoUri(uri);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Image source={{ uri: selectedTx.photoUri }} style={styles.detailPhoto} resizeMode="cover" />
+                    <View style={styles.photoExpandBtn}>
+                      <Ionicons name="expand-outline" size={16} color="#fff" />
+                    </View>
+                  </TouchableOpacity>
+                </>
+              )}
+
               <View style={styles.detailDivider} />
 
               {/* 기록자 */}
@@ -297,9 +365,7 @@ export default function CalendarScreen() {
                 <Text style={styles.detailRecorderLabel}>기록자</Text>
                 <View style={[styles.recorderBadge, { backgroundColor: personBg }]}>
                   <View style={[styles.dot, { backgroundColor: personColor }]} />
-                  <Text style={[styles.recorderName, { color: personColor }]}>
-                    {selectedTx.person === 'minji' ? '민지' : '준호'}
-                  </Text>
+                  <Text style={[styles.recorderName, { color: personColor }]}>{selectedTx.person}</Text>
                 </View>
               </View>
 
@@ -310,8 +376,13 @@ export default function CalendarScreen() {
                     style={styles.editBtn}
                     activeOpacity={0.8}
                     onPress={() => {
+                      const tx = selectedTx;
                       setSelectedTx(null);
-                      Alert.alert('수정', `"${selectedTx.memo}" 내역을 수정합니다.`);
+                      setSelectedDay(null);
+                      setEditTx(tx);
+                      setEditAmount(String(tx.amount));
+                      setEditMemo(tx.memo);
+                      setEditTime(tx.time as TimeSlot);
                     }}
                   >
                     <Ionicons name="pencil-outline" size={16} color={colors.text} />
@@ -323,7 +394,11 @@ export default function CalendarScreen() {
                     onPress={() => {
                       Alert.alert('삭제', `"${selectedTx.memo}" 내역을 삭제할까요?`, [
                         { text: '취소', style: 'cancel' },
-                        { text: '삭제', style: 'destructive', onPress: () => setSelectedTx(null) },
+                        { text: '삭제', style: 'destructive', onPress: () => {
+                          deleteTransaction(selectedTx.id);
+                          setSelectedTx(null);
+                          setSelectedDay(null);
+                        }},
                       ]);
                     }}
                   >
@@ -337,41 +412,90 @@ export default function CalendarScreen() {
         })()}
       </Modal>
 
+      {/* Edit Transaction Modal */}
+      <Modal visible={!!editTx} animationType="slide" transparent onRequestClose={() => setEditTx(null)}>
+        <KeyboardAvoidingView style={styles.editModalWrap} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setEditTx(null)} />
+          {editTx && (
+            <View style={[styles.editSheet, { paddingBottom: insets.bottom + 16 }]}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.editHeader}>
+                <Text style={styles.editTitle}>내역 수정</Text>
+                <TouchableOpacity onPress={() => setEditTx(null)}>
+                  <Ionicons name="close" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.editLabel}>금액</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editAmount}
+                onChangeText={(v) => setEditAmount(v.replace(/[^0-9]/g, ''))}
+                keyboardType="numeric"
+                placeholder="금액 입력"
+                placeholderTextColor={colors.inactive}
+              />
+              <Text style={styles.editLabel}>메모</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editMemo}
+                onChangeText={setEditMemo}
+                placeholder="메모 입력"
+                placeholderTextColor={colors.inactive}
+              />
+              <Text style={styles.editLabel}>시간대</Text>
+              <View style={styles.timeChipRow}>
+                {TIME_SLOTS.map((t) => (
+                  <TouchableOpacity
+                    key={t}
+                    style={[styles.timeChip, editTime === t && styles.timeChipActive]}
+                    onPress={() => setEditTime(t)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.timeChipText, editTime === t && styles.timeChipTextActive]}>
+                      {TIME_EMOJI[t]} {t}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={styles.editSaveBtn}
+                activeOpacity={0.85}
+                onPress={async () => {
+                  const amt = parseInt(editAmount, 10);
+                  if (!amt || amt <= 0) { Alert.alert('알림', '올바른 금액을 입력해주세요.'); return; }
+                  await updateTransaction(editTx.id, { amount: amt, memo: editMemo, time: editTime });
+                  setEditTx(null);
+                  Alert.alert('수정 완료', '내역이 수정되었습니다.');
+                }}
+              >
+                <Text style={styles.editSaveBtnText}>저장하기</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <PhotoViewerModal uri={viewPhotoUri} onClose={() => setViewPhotoUri(null)} />
+
       {/* Year/Month Picker Modal */}
-      <Modal visible={showYMPicker} animationType="fade" transparent onRequestClose={() => setShowYMPicker(false)}>
+      <Modal visible={showYMPicker} animationType="slide" transparent onRequestClose={() => setShowYMPicker(false)}>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowYMPicker(false)} />
-        <View style={styles.ymCard}>
+        <View style={[styles.ymSheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.sheetHandle} />
           <View style={styles.ymHeader}>
             <Text style={styles.ymTitle}>날짜 선택</Text>
             <TouchableOpacity onPress={() => setShowYMPicker(false)}>
-              <Ionicons name="close" size={18} color={colors.textSecondary} />
+              <Ionicons name="close" size={18} color={colors.text} />
             </TouchableOpacity>
           </View>
-          <View style={styles.ymBody}>
-            <View style={styles.ymCol}>
-              <TouchableOpacity onPress={() => setPickYear(y => y - 1)}>
-                <Ionicons name="chevron-up" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <View style={styles.ymSelBox}><Text style={styles.ymSelText}>{pickYear}</Text></View>
-              <TouchableOpacity onPress={() => setPickYear(y => y + 1)}>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <Text style={styles.ymUnit}>년</Text>
-            </View>
-            <View style={styles.ymCol}>
-              <TouchableOpacity onPress={() => setPickMonth(m => m > 1 ? m - 1 : 12)}>
-                <Ionicons name="chevron-up" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <View style={styles.ymSelBox}><Text style={styles.ymSelText}>{pickMonth}</Text></View>
-              <TouchableOpacity onPress={() => setPickMonth(m => m < 12 ? m + 1 : 1)}>
-                <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <Text style={styles.ymUnit}>월</Text>
-            </View>
+          <View style={styles.ymDivider} />
+          <View style={styles.ymPickerRow}>
+            <WheelPicker items={YEARS} selectedIndex={pickYearIdx} onSelect={setPickYearIdx} />
+            <WheelPicker items={MONTHS} selectedIndex={pickMonthIdx} onSelect={setPickMonthIdx} format={(v) => `${v}월`} />
           </View>
           <TouchableOpacity
             style={styles.ymConfirmBtn}
-            onPress={() => { setCurrentDate(new Date(pickYear, pickMonth - 1, 1)); setShowYMPicker(false); }}
+            onPress={() => { setCurrentDate(new Date(YEARS[pickYearIdx], MONTHS[pickMonthIdx] - 1, 1)); setShowYMPicker(false); }}
             activeOpacity={0.85}
           >
             <Text style={styles.ymConfirmText}>확인</Text>
@@ -383,9 +507,9 @@ export default function CalendarScreen() {
 }
 
 // Helper style function
-const filterChipActive = (key: Person) => {
-  if (key === 'minji') return { backgroundColor: '#FDF0F6', borderColor: '#C4729A' };
-  if (key === 'junho') return { backgroundColor: '#EBF0FF', borderColor: '#4A90D9' };
+const filterChipActive = (key: PersonFilter) => {
+  if (key === 'me')      return { backgroundColor: '#FDF0F6', borderColor: '#C4729A' };
+  if (key === 'partner') return { backgroundColor: '#EBF0FF', borderColor: '#4A90D9' };
   return { backgroundColor: colors.primary, borderColor: colors.primary };
 };
 
@@ -405,7 +529,6 @@ const styles = StyleSheet.create({
   },
   filterChipActive: {} as any,
   filterText: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
-  filterTextActive: { fontFamily: fonts.semiBold, color: colors.text },
 
   weekRow: { flexDirection: 'row', paddingHorizontal: 4, marginBottom: 4 },
   weekDay: { flex: 1, textAlign: 'center', fontFamily: fonts.semiBold, fontSize: 11, color: colors.textSecondary },
@@ -425,10 +548,11 @@ const styles = StyleSheet.create({
   personDot: { width: 6, height: 6, borderRadius: 3 },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
 
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
   sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingTop: 12, maxHeight: '60%',
+    paddingHorizontal: 20, paddingTop: 12, maxHeight: '65%',
   },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 14 },
   sheetTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.text, marginBottom: 14 },
@@ -445,28 +569,44 @@ const styles = StyleSheet.create({
   txEditBtn: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.canvas },
   txEditText: { fontFamily: fonts.medium, fontSize: 10, color: colors.primary },
 
-  // Year/Month picker
-  ymCard: {
-    position: 'absolute', top: '30%', left: '10%', right: '10%',
-    backgroundColor: colors.card, borderRadius: 20, padding: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
-  },
-  ymHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  // Edit modal
+  editModalWrap: { flex: 1, justifyContent: 'flex-end' },
+  editSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
+  editHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, marginBottom: 4 },
+  editTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
+  editLabel: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textSecondary, marginBottom: 8, marginTop: 14 },
+  editInput: { backgroundColor: colors.canvas, borderRadius: 12, borderWidth: 1, borderColor: colors.border, height: 48, paddingHorizontal: 14, fontFamily: fonts.regular, fontSize: 15, color: colors.text },
+  timeChipRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  timeChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, backgroundColor: colors.canvas },
+  timeChipActive: { backgroundColor: colors.primary },
+  timeChipText: { fontFamily: fonts.medium, fontSize: 13, color: colors.text },
+  timeChipTextActive: { color: '#FFFFFF' },
+  editSaveBtn: { marginTop: 20, backgroundColor: colors.primary, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
+  editSaveBtnText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
+
+  // Year/Month picker bottom sheet
+  ymSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  ymHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, paddingHorizontal: 20 },
   ymTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
-  ymBody: { flexDirection: 'row', justifyContent: 'center', gap: 24, marginBottom: 20 },
-  ymCol: { alignItems: 'center', gap: 8 },
-  ymUnit: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary },
-  ymSelBox: { width: 80, height: 44, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  ymSelText: { fontFamily: fonts.bold, fontSize: 18, color: '#FFFFFF' },
-  ymConfirmBtn: { backgroundColor: colors.primary, borderRadius: 100, height: 48, alignItems: 'center', justifyContent: 'center' },
-  ymConfirmText: { fontFamily: fonts.semiBold, fontSize: 15, color: '#FFFFFF' },
+  ymDivider: { height: 1, backgroundColor: colors.border },
+  ymPickerRow: { flexDirection: 'row', height: ITEM_H * 5, marginTop: 8 },
+  ymConfirmBtn: { marginHorizontal: 20, marginTop: 16, backgroundColor: colors.primary, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
+  ymConfirmText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
+
+  // Wheel picker
+  wheelOuter: { flex: 1, overflow: 'hidden' },
+  wheelItem: { height: ITEM_H, alignItems: 'center', justifyContent: 'center', marginHorizontal: 8 },
+  wheelItemSelected: { backgroundColor: colors.primary, borderRadius: 12 },
+  wheelText: { color: colors.text },
+
+  filterTextActive: {} as any,
 
   sheetTotal: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 },
   sheetTotalLabel: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textSecondary },
   sheetTotalVal: { fontFamily: fonts.bold, fontSize: 15, color: colors.text },
 
   // 거래 상세 시트 (tcF6p)
-  detailSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 8 },
+  detailSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 8 },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 52 },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
   catChipText: { fontFamily: fonts.semiBold, fontSize: 13 },
@@ -477,6 +617,13 @@ const styles = StyleSheet.create({
   expenseTagText: { fontFamily: fonts.medium, fontSize: 11, color: '#E05C5C' },
   detailAmt: { fontFamily: fonts.bold, fontSize: 34, color: colors.text, letterSpacing: -1 },
   detailDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
+  detailPhoto: { width: '100%', height: 180, borderRadius: 12, marginVertical: 4 },
+  photoExpandBtn: {
+    position: 'absolute', bottom: 12, right: 8,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   detailMemoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
   detailMemoText: { fontFamily: fonts.regular, fontSize: 14, color: colors.text, flex: 1 },
   detailRecorderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },

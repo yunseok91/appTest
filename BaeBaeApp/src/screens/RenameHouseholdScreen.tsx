@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
-  TextInput, KeyboardAvoidingView, Platform,
+  TextInput, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors, fonts } from '../theme/colors';
+import { useAuth } from '../context/AuthContext';
 
 const MAX_LENGTH = 12;
 
 export default function RenameHouseholdScreen() {
   const navigation = useNavigation();
-  const [name, setName] = useState('우리 가계부');
+  const { householdName, setHouseholdName } = useAuth();
+  const [name, setName] = useState(householdName);
 
   const handleChange = (text: string) => {
     if (text.length <= MAX_LENGTH) setName(text);
@@ -59,7 +61,11 @@ export default function RenameHouseholdScreen() {
           {/* Save button */}
           <TouchableOpacity
             style={[styles.saveBtn, !name.trim() && styles.saveBtnDisabled]}
-            onPress={() => navigation.goBack()}
+            onPress={async () => {
+              await setHouseholdName(name);
+              Alert.alert('저장 완료', '가계명이 저장되었습니다.');
+              navigation.goBack();
+            }}
             disabled={!name.trim()}
             activeOpacity={0.85}
           >

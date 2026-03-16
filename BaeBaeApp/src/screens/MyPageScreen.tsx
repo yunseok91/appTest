@@ -8,30 +8,32 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, fonts } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { useProfile } from '../context/ProfileContext';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type Card = { id: string; alias: string };
 
 export default function MyPageScreen() {
   const navigation = useNavigation<Nav>();
+  const { budget, setBudget, cards, addCard, deleteCard } = useProfile();
   const [notifOn, setNotifOn] = useState(true);
-  const [cards, setCards] = useState<Card[]>([
-    { id: '1', alias: '신한카드' },
-    { id: '2', alias: '국민카드' },
-  ]);
   const [showCardAdd, setShowCardAdd] = useState(false);
   const [newAlias, setNewAlias] = useState('');
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [showBudgetEdit, setShowBudgetEdit] = useState(false);
+  const [budgetInput, setBudgetInput] = useState('');
 
-  const addCard = () => {
+  const handleAddCard = async () => {
     if (!newAlias.trim()) return;
-    setCards(prev => [...prev, { id: Date.now().toString(), alias: newAlias.trim() }]);
+    await addCard(newAlias.trim());
     setNewAlias('');
     setShowCardAdd(false);
   };
 
-  const deleteCard = (id: string) => {
-    setCards(prev => prev.filter(c => c.id !== id));
+  const handleSaveBudget = async () => {
+    const v = Number(budgetInput.replace(/[^0-9]/g, ''));
+    if (!v) return;
+    await setBudget(v);
+    setShowBudgetEdit(false);
   };
 
   const SectionHeader = ({ title }: { title: string }) => (
@@ -90,9 +92,13 @@ export default function MyPageScreen() {
         <View style={styles.budgetCard}>
           <View style={styles.budgetLeft}>
             <Text style={styles.budgetLbl}>이번 달 예산</Text>
-            <Text style={styles.budgetAmt}>₩3,000,000</Text>
+            <Text style={styles.budgetAmt}>₩{budget.toLocaleString()}</Text>
           </View>
-          <TouchableOpacity style={styles.budgetEditBtn} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.budgetEditBtn}
+            activeOpacity={0.8}
+            onPress={() => { setBudgetInput(String(budget)); setShowBudgetEdit(true); }}
+          >
             <Text style={styles.budgetEditText}>수정</Text>
           </TouchableOpacity>
         </View>
@@ -117,7 +123,7 @@ export default function MyPageScreen() {
             </React.Fragment>
           ))}
           {cards.length > 0 && <View style={styles.divider} />}
-          <TouchableOpacity style={styles.menuItem} onPress={() => setShowCardAdd(true)} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => { setNewAlias(''); setShowCardAdd(true); }} activeOpacity={0.7}>
             <Ionicons name="add-circle-outline" size={20} color={colors.primary} style={{ width: 24 }} />
             <Text style={[styles.menuLabel, { color: colors.primary }]}>카드 추가</Text>
           </TouchableOpacity>
@@ -210,17 +216,48 @@ export default function MyPageScreen() {
               placeholder="카드 별칭 입력 (예: 내 신한카드)"
               placeholderTextColor={colors.textMuted}
               returnKeyType="done"
-              onSubmitEditing={addCard}
+              onSubmitEditing={handleAddCard}
               autoFocus
             />
           </View>
           <TouchableOpacity
             style={[styles.addBtn, !newAlias.trim() && { opacity: 0.4 }]}
-            onPress={addCard}
+            onPress={handleAddCard}
             disabled={!newAlias.trim()}
             activeOpacity={0.85}
           >
             <Text style={styles.addBtnText}>추가하기</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* 예산 수정 Bottom Sheet */}
+      <Modal visible={showBudgetEdit} animationType="slide" transparent onRequestClose={() => setShowBudgetEdit(false)}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowBudgetEdit(false)} />
+        <View style={styles.cardSheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>예산 수정</Text>
+          <View style={styles.cardInputRow}>
+            <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: colors.text }}>₩</Text>
+            <TextInput
+              style={styles.cardInput}
+              value={budgetInput ? Number(budgetInput).toLocaleString('ko-KR') : ''}
+              onChangeText={(t) => setBudgetInput(t.replace(/[^0-9]/g, ''))}
+              placeholder="예산 금액 입력"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              onSubmitEditing={handleSaveBudget}
+              autoFocus
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.addBtn, !budgetInput.trim() && { opacity: 0.4 }]}
+            onPress={handleSaveBudget}
+            disabled={!budgetInput.trim()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.addBtnText}>저장하기</Text>
           </TouchableOpacity>
         </View>
       </Modal>

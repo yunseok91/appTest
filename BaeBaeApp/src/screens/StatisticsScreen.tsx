@@ -1,39 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
   ScrollView, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts } from '../theme/colors';
+import { useTransactions } from '../context/TransactionContext';
+import { useAuth } from '../context/AuthContext';
 
 const ITEM_H = 48;
 const YEARS = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030];
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-const CAT_COLORS: Record<string, string> = {
-  '식비':     '#E8956D',
-  '교통':     '#6B9EC7',
-  '쇼핑':     '#B87BA5',
-  '문화/여가': '#7C8FC5',
-  '미용/관리': '#E8A0B5',
-  '운동':     '#6DAF7E',
-  '주거/통신': '#8AA5B8',
-  '기타':     '#A09585',
-};
-
-const MY_CATS = [
-  { label: '식비',  pct: 30, amount: 305000, color: CAT_COLORS['식비'] },
-  { label: '쇼핑',  pct: 25, amount: 258000, color: CAT_COLORS['쇼핑'] },
-  { label: '교통',  pct: 15, amount: 152000, color: CAT_COLORS['교통'] },
-  { label: '기타',  pct: 30, amount: 300000, color: CAT_COLORS['기타'] },
-];
-
-const PARTNER_CATS = [
-  { label: '식비',  pct: 45, amount: 180000, color: CAT_COLORS['식비'] },
-  { label: '교통',  pct: 20, amount: 80000,  color: CAT_COLORS['교통'] },
-  { label: '운동',  pct: 20, amount: 80000,  color: CAT_COLORS['운동'] },
-  { label: '기타',  pct: 15, amount: 60000,  color: CAT_COLORS['기타'] },
-];
 
 function DonutChart({ categories, totalLabel, totalAmt }: {
   categories: typeof MY_CATS;
@@ -86,30 +63,38 @@ function WheelPicker({ items, selectedIndex, onSelect, format }: {
     }, 50);
   }, [selectedIndex]);
 
+  const handleSnap = (e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
+    const clamped = Math.max(0, Math.min(idx, items.length - 1));
+    onSelect(clamped);
+  };
+
   return (
     <View style={styles.wheelOuter}>
-      {/* 선택 하이라이트 */}
-      <View pointerEvents="none" style={styles.wheelHighlight} />
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_H}
         decelerationRate="fast"
+        nestedScrollEnabled
         contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
-        onMomentumScrollEnd={(e) => {
-          const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
-          const clamped = Math.max(0, Math.min(idx, items.length - 1));
-          onSelect(clamped);
-        }}
+        onMomentumScrollEnd={handleSnap}
+        onScrollEndDrag={handleSnap}
       >
         {items.map((v, i) => {
           const dist = Math.abs(i - selectedIndex);
-          const opacity = dist === 0 ? 1 : dist === 1 ? 0.45 : 0.2;
-          const fontSize = dist === 0 ? 18 : dist === 1 ? 15 : 13;
+          const isSelected = dist === 0;
+          const opacity = dist === 0 ? 1 : dist === 1 ? 0.55 : 0.25;
+          const fontSize = dist === 0 ? 17 : dist === 1 ? 15 : 13;
           const fontWeight = dist === 0 ? fonts.bold : fonts.regular;
           return (
-            <View key={v} style={styles.wheelItem}>
-              <Text style={[styles.wheelText, { opacity, fontSize, fontFamily: fontWeight }]}>
+            <View key={v} style={[styles.wheelItem, isSelected && styles.wheelItemSelected]}>
+              <Text style={[styles.wheelText, {
+                opacity,
+                fontSize,
+                fontFamily: fontWeight,
+                color: isSelected ? '#FFFFFF' : colors.text,
+              }]}>
                 {label(v)}
               </Text>
             </View>
@@ -121,14 +106,40 @@ function WheelPicker({ items, selectedIndex, onSelect, format }: {
 }
 
 export default function StatisticsScreen() {
-  const [person, setPerson] = useState<'me' | 'partner'>('me');
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(3);
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickYearIdx, setPickYearIdx] = useState(YEARS.indexOf(2026));
-  const [pickMonthIdx, setPickMonthIdx] = useState(2); // 3월 = index 2
+  const { transactions } = useTransactions();
+  const { user } = useAuth();
+  const [person, setPerson] = useState<'all' | 'me' | 'partner'>('all');
 
-  const cats = person === 'me' ? MY_CATS : PARTNER_CATS;
+  const now = new Date();
+  const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(now.getMonth() + 1);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickYearIdx, setPickYearIdx] = useState(YEARS.indexOf(now.getFullYear()));
+  const [pickMonthIdx, setPickMonthIdx] = useState(now.getMonth());
+
+  const monthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+  const myName = user?.name ?? '나';
+
+  const monthlyExpenses = useMemo(() =>
+    transactions.filter(tx =>
+      tx.type === 'expense' &&
+      tx.date.startsWith(monthStr) &&
+      (person === 'all' ? true : person === 'me' ? tx.person === myName : tx.person !== myName)
+    ), [transactions, monthStr, person, myName]);
+
+  const cats = useMemo(() => {
+    const map: Record<string, { label: string; amount: number; color: string; icon: string; iconColor: string; bgColor: string }> = {};
+    monthlyExpenses.forEach(tx => {
+      if (!map[tx.category]) {
+        map[tx.category] = { label: tx.category, amount: 0, color: tx.categoryIconColor, icon: tx.categoryIcon, iconColor: tx.categoryIconColor, bgColor: tx.categoryBgColor };
+      }
+      map[tx.category].amount += tx.amount;
+    });
+    const arr = Object.values(map).sort((a, b) => b.amount - a.amount).slice(0, 4);
+    const total = arr.reduce((s, c) => s + c.amount, 0);
+    return arr.map(c => ({ ...c, pct: total > 0 ? Math.round(c.amount / total * 100) : 0 }));
+  }, [monthlyExpenses]);
+
   const totalSpend = cats.reduce((s, c) => s + c.amount, 0);
 
   const openPicker = () => {
@@ -155,8 +166,9 @@ export default function StatisticsScreen() {
             <TouchableOpacity onPress={() => setCurrentMonth(m => m > 1 ? m - 1 : 12)} activeOpacity={0.7}>
               <Ionicons name="chevron-back" size={18} color={colors.text} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={openPicker} activeOpacity={0.7}>
-              <Text style={styles.headerMonth}>{currentMonth}월</Text>
+            <TouchableOpacity style={styles.monthBtn} onPress={openPicker} activeOpacity={0.7}>
+              <Text style={styles.headerMonth}>{currentYear}년 {currentMonth}월</Text>
+              <Ionicons name="chevron-down" size={14} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setCurrentMonth(m => m < 12 ? m + 1 : 1)} activeOpacity={0.7}>
               <Ionicons name="chevron-forward" size={18} color={colors.text} />
@@ -166,11 +178,11 @@ export default function StatisticsScreen() {
 
         {/* Person toggle */}
         <View style={styles.personToggle}>
-          {[{ key: 'me', label: '나' }, { key: 'partner', label: '파트너' }].map(({ key, label }) => (
+          {([{ key: 'all', label: '전체' }, { key: 'me', label: '나' }, { key: 'partner', label: '파트너' }] as const).map(({ key, label }) => (
             <TouchableOpacity
               key={key}
               style={[styles.personBtn, person === key && styles.personBtnActive]}
-              onPress={() => setPerson(key as 'me' | 'partner')}
+              onPress={() => setPerson(key)}
               activeOpacity={0.8}
             >
               <Text style={[styles.personBtnText, person === key && styles.personBtnTextActive]}>{label}</Text>
@@ -186,19 +198,26 @@ export default function StatisticsScreen() {
 
         {/* Category list */}
         <Text style={styles.catTitle}>카테고리별 지출</Text>
-        <View style={styles.catCard}>
-          {cats.map((cat, i) => (
-            <React.Fragment key={cat.label}>
-              {i > 0 && <View style={styles.catDivider} />}
-              <View style={styles.catRow}>
-                <View style={[styles.catDot, { backgroundColor: cat.color }]} />
-                <Text style={styles.catLabel}>{cat.label}</Text>
-                <Text style={styles.catPct}>{cat.pct}%</Text>
-                <Text style={styles.catAmt}>₩{cat.amount.toLocaleString()}</Text>
-              </View>
-            </React.Fragment>
-          ))}
-        </View>
+        {cats.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <Ionicons name="bar-chart-outline" size={36} color={colors.border} />
+            <Text style={styles.emptyText}>이번 달 지출 내역이 없어요</Text>
+          </View>
+        ) : (
+          <View style={styles.catCard}>
+            {cats.map((cat, i) => (
+              <React.Fragment key={cat.label}>
+                {i > 0 && <View style={styles.catDivider} />}
+                <View style={styles.catRow}>
+                  <View style={[styles.catDot, { backgroundColor: cat.color }]} />
+                  <Text style={styles.catLabel}>{cat.label}</Text>
+                  <Text style={styles.catPct}>{cat.pct}%</Text>
+                  <Text style={styles.catAmt}>₩{cat.amount.toLocaleString()}</Text>
+                </View>
+              </React.Fragment>
+            ))}
+          </View>
+        )}
 
         <View style={{ height: 20 }} />
       </ScrollView>
@@ -245,6 +264,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
   headerTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.text },
   headerMonth: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.text },
+  monthBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.canvas },
   monthToggle: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 
   personToggle: { flexDirection: 'row', backgroundColor: colors.canvas, marginHorizontal: 20, borderRadius: 100, padding: 4, gap: 2, height: 40, marginBottom: 16 },
@@ -264,6 +284,8 @@ const styles = StyleSheet.create({
 
   catTitle: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.text, paddingHorizontal: 20, marginBottom: 10 },
   catCard: { backgroundColor: colors.card, marginHorizontal: 20, borderRadius: 16, overflow: 'hidden', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+  emptyWrap: { alignItems: 'center', gap: 10, paddingVertical: 40 },
+  emptyText: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted },
   catDivider: { height: 1, backgroundColor: colors.canvas },
   catRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
   catDot: { width: 10, height: 10, borderRadius: 5 },
@@ -272,8 +294,8 @@ const styles = StyleSheet.create({
   catAmt: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.text, width: 90, textAlign: 'right' },
 
   // 바텀시트
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  ymSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32 },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+  ymSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   ymHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, paddingHorizontal: 20 },
   ymTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
@@ -282,12 +304,8 @@ const styles = StyleSheet.create({
   // 휠 피커
   ymPickerRow: { flexDirection: 'row', height: ITEM_H * 5, marginTop: 8 },
   wheelOuter: { flex: 1, overflow: 'hidden' },
-  wheelHighlight: {
-    position: 'absolute', zIndex: 1,
-    top: ITEM_H * 2, left: 12, right: 12, height: ITEM_H,
-    backgroundColor: colors.primary, borderRadius: 12, opacity: 0.12,
-  },
-  wheelItem: { height: ITEM_H, alignItems: 'center', justifyContent: 'center' },
+  wheelItem: { height: ITEM_H, alignItems: 'center', justifyContent: 'center', marginHorizontal: 8 },
+  wheelItemSelected: { backgroundColor: colors.primary, borderRadius: 12 },
   wheelText: { color: colors.text },
 
   ymConfirmBtn: { marginHorizontal: 20, marginTop: 16, backgroundColor: colors.primary, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },

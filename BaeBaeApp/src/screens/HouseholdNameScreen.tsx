@@ -8,6 +8,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { useAuth } from '../context/AuthContext';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'HouseholdName'>;
 
@@ -15,6 +16,7 @@ const MAX_LENGTH = 12;
 
 export default function HouseholdNameScreen() {
   const navigation = useNavigation<Nav>();
+  const { setHouseholdName } = useAuth();
   const [name, setName] = useState('');
 
   return (
@@ -75,7 +77,10 @@ export default function HouseholdNameScreen() {
           {/* Buttons */}
           <TouchableOpacity
             style={styles.saveBtn}
-            onPress={() => navigation.navigate('MainTabs')}
+            onPress={async () => {
+              await setHouseholdName(name);
+              navigation.navigate('MainTabs');
+            }}
             activeOpacity={0.85}
           >
             <Text style={styles.saveBtnText}>저장하기</Text>

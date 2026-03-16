@@ -22,6 +22,10 @@
         "backgroundColor": "#F5F4F0"
       },
       "package": "com.baebae.app"
-    }
+    },
+    "scheme": "baebae",
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

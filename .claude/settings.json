@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -ExecutionPolicy Bypass -Command \"Set-Location ''c:\\\\스터디\\\\appTest\\\\BaeBaeApp''; npx eas-cli update --branch main --message ''partner name/gender Firestore sync + HomeScreen partner avatar + household name conflict UI'' 2>&1\")"
+    ]
+  }
+}

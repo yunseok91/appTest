@@ -22,7 +22,6 @@ export const colors = {
   // Semantic
   secondary: '#D08068',       // expense / danger-ish
   secondaryLight: '#F5EDED',
-  yellow: '#D4A017',
 
   // Status
   success: '#3D8A5A',
@@ -33,7 +32,7 @@ export const colors = {
   // Common
   white: '#FFFFFF',
   black: '#1A1918',
-  overlay: 'rgba(26,25,24,0.4)',
+  overlay: 'rgba(26,25,24,0.65)',
 } as const;
 
 export const fonts = {

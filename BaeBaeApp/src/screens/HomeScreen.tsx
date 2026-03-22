@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
+  View, Text, TouchableOpacity, StyleSheet, StatusBar,
   Modal, FlatList, TextInput, Image,
-  Alert, ScrollView,
+  Alert, ScrollView, Keyboard, TouchableWithoutFeedback,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, fonts } from '../theme/colors';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, type Category } from '../config/categoryIcons';
 import { useTransactions } from '../context/TransactionContext';
@@ -19,11 +21,7 @@ type PayMethod = 'cash' | 'card';
 
 type Notification = { id: string; message: string; time: string; read: boolean };
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: '1', message: '준호님이 저녁 식비 ₩32,000을 기록했습니다', time: '방금 전', read: false },
-  { id: '2', message: '민지님이 카페 ₩6,500을 기록했습니다', time: '1시간 전', read: false },
-  { id: '3', message: '이번 달 예산의 80%를 사용했어요', time: '오늘', read: true },
-];
+
 
 type Card = { id: string; name: string; color: string };
 
@@ -43,9 +41,10 @@ const TIME_LABEL: Record<TimeSlot, '아침' | '점심' | '저녁'> = {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
   const { addTransaction, transactions } = useTransactions();
-  const { user, householdName } = useAuth();
-  const { budget, cards: profileCards } = useProfile();
+  const { user, householdName, partnerName, partnerGender } = useAuth();
+  const { budget, cards: profileCards, myName, myGender } = useProfile();
 
   // Map profile cards to local Card type (memoized to avoid effect loop)
   const cards = useMemo<Card[]>(
@@ -63,7 +62,7 @@ export default function HomeScreen() {
     .filter(tx => tx.type === 'income' && tx.date.startsWith(monthStr))
     .reduce((s, tx) => s + tx.amount, 0);
   const monthlyBalance = monthlyIncome - monthlyExpense;
-  const isOverBudget = monthlyExpense > budget;
+  const isOverBudget = budget > 0 && monthlyExpense > budget;
 
   const [timeSlot, setTimeSlot] = useState<TimeSlot>(getKoreanTimeSlot);
   const [tab, setTab] = useState<TabType>('expense');
@@ -74,6 +73,18 @@ export default function HomeScreen() {
 
   const [payMethod, setPayMethod] = useState<PayMethod>('cash');
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+
+  // 최초 1회 웰컴 팝업
+  useEffect(() => {
+    AsyncStorage.getItem('@baebae_welcome_shown').then(val => {
+      if (!val) setShowWelcome(true);
+    });
+  }, []);
+
+  const handleCloseWelcome = async () => {
+    await AsyncStorage.setItem('@baebae_welcome_shown', 'true');
+    setShowWelcome(false);
+  };
 
   // Sync selectedCard when profile cards update
   React.useEffect(() => {
@@ -86,12 +97,13 @@ export default function HomeScreen() {
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCardPicker, setShowCardPicker] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const [selectedDate, setSelectedDate] = useState(new Date(2026, 2, 14));
-  const [pickerDate, setPickerDate] = useState(new Date(2026, 2, 1));
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [pickerDate, setPickerDate] = useState(() => { const d = new Date(); d.setDate(1); return d; });
 
   const categories = tab === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
 
@@ -133,14 +145,19 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} translucent={false} />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'android' ? 0 : 0}
+      >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <ScrollView
+          ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
         >
           {/* Header */}
           <View style={styles.header}>
@@ -149,7 +166,7 @@ export default function HomeScreen() {
                 <Text style={styles.relChipEmoji}>💑</Text>
                 <Text style={styles.relChipText}>연인</Text>
               </View>
-              <Text style={styles.coupleName}>{householdName}</Text>
+              <Text style={styles.coupleName} allowFontScaling={false}>{householdName}</Text>
             </View>
             <TouchableOpacity onPress={() => setShowNotifications(true)} activeOpacity={0.7} style={{ position: 'relative' }}>
               <Ionicons name="notifications-outline" size={22} color={colors.text} />
@@ -163,23 +180,41 @@ export default function HomeScreen() {
 
           {/* Avatar row */}
           <View style={styles.avatarRow}>
-            <View style={[styles.avatarCircle, { backgroundColor: '#f2d9e1' }]}>
-              <Image source={require('../../assets/avatars/HMHJX.png')} style={styles.avatarImg} resizeMode="contain" />
+            <View style={[styles.avatarCircle, { backgroundColor: myGender === 'female' ? '#f2d9e1' : '#cbdfee' }]}>
+              <Image
+                source={myGender === 'female'
+                  ? require('../../assets/avatars/HMHJX.png')
+                  : require('../../assets/avatars/aRbFP.png')}
+                style={styles.avatarImg}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.avatarName}>민지</Text>
+            <Text style={styles.avatarName}>{myName || '나'}</Text>
             <Ionicons name="heart" size={11} color={colors.secondary} />
-            <View style={[styles.avatarCircle, { backgroundColor: '#cbdfee' }]}>
-              <Image source={require('../../assets/avatars/aRbFP.png')} style={styles.avatarImg} resizeMode="contain" />
-            </View>
-            <Text style={styles.avatarName}>준호</Text>
+            {partnerGender ? (
+              <View style={[styles.avatarCircle, { backgroundColor: partnerGender === 'female' ? '#f2d9e1' : '#cbdfee' }]}>
+                <Image
+                  source={partnerGender === 'female'
+                    ? require('../../assets/avatars/HMHJX.png')
+                    : require('../../assets/avatars/aRbFP.png')}
+                  style={styles.avatarImg}
+                  resizeMode="contain"
+                />
+              </View>
+            ) : (
+              <View style={[styles.avatarCircle, { backgroundColor: '#E8E8E8' }]}>
+                <Ionicons name="person-outline" size={18} color={colors.textMuted} />
+              </View>
+            )}
+            <Text style={styles.avatarName}>{partnerName || '파트너'}</Text>
           </View>
 
           {/* Balance */}
           <View style={styles.balance}>
             <Text style={styles.balLbl}>이번 달 잔액</Text>
             <View style={styles.balAmtRow}>
-              <Text style={[styles.balAmt, isOverBudget && { color: colors.secondary }]}>
-                ₩{monthlyBalance.toLocaleString()}
+              <Text style={[styles.balAmt, isOverBudget && { color: colors.secondary }]} allowFontScaling={false}>
+                <Text style={styles.wonSign}>₩</Text>{monthlyBalance.toLocaleString()}
               </Text>
               {isOverBudget && (
                 <View style={styles.overBudgetBubble}>
@@ -191,12 +226,12 @@ export default function HomeScreen() {
             <View style={styles.statRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statLbl}>수입</Text>
-                <Text style={[styles.statVal, { color: colors.primary }]}>₩{monthlyIncome.toLocaleString()}</Text>
+                <Text style={[styles.statVal, { color: colors.primary }]} allowFontScaling={false}><Text style={styles.wonSign}>₩</Text>{monthlyIncome.toLocaleString()}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statLbl}>지출</Text>
-                <Text style={[styles.statVal, { color: colors.secondary }]}>₩{monthlyExpense.toLocaleString()}</Text>
+                <Text style={[styles.statVal, { color: colors.secondary }]} allowFontScaling={false}><Text style={styles.wonSign}>₩</Text>{monthlyExpense.toLocaleString()}</Text>
               </View>
             </View>
           </View>
@@ -342,6 +377,9 @@ export default function HomeScreen() {
                 multiline
                 textAlignVertical="top"
                 returnKeyType="done"
+                onFocus={() => {
+                  setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 200);
+                }}
               />
             </View>
 
@@ -366,27 +404,34 @@ export default function HomeScreen() {
                   const y = selectedDate.getFullYear();
                   const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
                   const d = String(selectedDate.getDate()).padStart(2, '0');
-                  await addTransaction({
-                    type: tab === 'expense' ? 'expense' : 'income',
-                    category: selectedCategory.label,
-                    categoryKey: selectedCategory.key,
-                    categoryIcon: selectedCategory.icon,
-                    categoryIconColor: selectedCategory.iconColor,
-                    categoryBgColor: selectedCategory.bgColor,
-                    amount: Number(amount),
-                    memo,
-                    date: `${y}-${m}-${d}`,
-                    time: TIME_LABEL[timeSlot],
-                    person: user?.name ?? '나',
-                    payMethod,
-                    cardName: payMethod === 'card' ? selectedCard?.name : undefined,
-                    photoUri: photoUri ?? undefined,
-                  });
-                  setAmount('');
-                  setMemo('');
-                  setPhotoUri(null);
-                  setSelectedCategory(null);
-                  Alert.alert('저장했습니다', '내역이 성공적으로 저장되었습니다.');
+                  try {
+                    await addTransaction({
+                      type: tab === 'expense' ? 'expense' : 'income',
+                      category: selectedCategory.label,
+                      categoryKey: selectedCategory.key,
+                      categoryIcon: selectedCategory.icon,
+                      categoryIconColor: selectedCategory.iconColor,
+                      categoryBgColor: selectedCategory.bgColor,
+                      amount: Number(amount),
+                      memo,
+                      date: `${y}-${m}-${d}`,
+                      time: TIME_LABEL[timeSlot],
+                      person: myName || user?.name || '나',
+                      payMethod,
+                      cardName: payMethod === 'card' ? selectedCard?.name : undefined,
+                      photoUri: photoUri ?? undefined,
+                    });
+                    setAmount('');
+                    setMemo('');
+                    setPhotoUri(null);
+                    setSelectedCategory(null);
+                    Alert.alert('저장했습니다', '내역이 성공적으로 저장되었습니다.');
+                  } catch (err: any) {
+                    Alert.alert(
+                      '저장 실패',
+                      `저장 중 오류가 발생했습니다.\n\n${err?.message ?? String(err)}`,
+                    );
+                  }
                 }}
               >
                 <Ionicons name="checkmark" size={16} color={colors.white} />
@@ -396,6 +441,24 @@ export default function HomeScreen() {
 
           </View>
         </ScrollView>
+      </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+
+      {/* 웰컴 팝업 — 최초 1회 */}
+      <Modal visible={showWelcome} transparent animationType="fade" onRequestClose={handleCloseWelcome}>
+        <View style={styles.welcomeOverlay}>
+          <View style={styles.welcomeCard}>
+            <Text style={styles.welcomeEmoji}>🎉</Text>
+            <Text style={styles.welcomeTitle} allowFontScaling={false}>우리 가계부 시작!</Text>
+            <Text style={styles.welcomeSub}>
+              {myName ? `${myName}의 첫 번째 날이에요\n` : ''}함께 기록을 시작해볼까요? 💑
+            </Text>
+            <TouchableOpacity style={styles.welcomeBtn} onPress={handleCloseWelcome} activeOpacity={0.85}>
+              <Text style={styles.welcomeBtnText}>시작하기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* 카테고리 피커 */}
       <Modal visible={showCategoryPicker} animationType="slide" transparent onRequestClose={() => setShowCategoryPicker(false)}>
@@ -556,9 +619,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
 
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    gap: 22,
   },
 
   // Header
@@ -579,20 +642,21 @@ const styles = StyleSheet.create({
   avatarName: { fontFamily: fonts.medium, fontSize: 11, color: colors.textSecondary },
 
   // Balance
-  balance: { gap: 2 },
+  balance: { gap: 10 },
   balLbl: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
   balAmtRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  balAmt: { fontFamily: fonts.bold, fontSize: 30, color: colors.text, letterSpacing: -1 },
+  balAmt: { fontFamily: fonts.bold, fontSize: 30, color: colors.text, letterSpacing: 0 },
+  wonSign: { fontFamily: undefined },  // Outfit폰트 ₩ 미지원 → 시스템 폰트로 렌더링, fontSize는 부모에서 상속
   overBudgetBubble: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#FEE2E2', borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4,
   },
   overBudgetText: { fontFamily: fonts.semiBold, fontSize: 11, color: '#E05C5C' },
-  statRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 2 },
-  statItem: { gap: 0 },
-  statLbl: { fontFamily: fonts.regular, fontSize: 10, color: colors.textSecondary },
-  statVal: { fontFamily: fonts.semiBold, fontSize: 12 },
-  statDivider: { width: 1, height: 18, backgroundColor: colors.border },
+  statRow: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+  statItem: { gap: 2 },
+  statLbl: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  statVal: { fontFamily: fonts.semiBold, fontSize: 14 },
+  statDivider: { width: 1, height: 28, backgroundColor: colors.border },
 
   // Time selector
   timeSelector: { flexDirection: 'row', gap: 6 },
@@ -607,9 +671,10 @@ const styles = StyleSheet.create({
   // Input card — 고정 높이 없음, 자연스럽게 내용에 맞게
   inputCard: {
     backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 16,
-    gap: 12,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    gap: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.07,
@@ -660,14 +725,14 @@ const styles = StyleSheet.create({
   cardPickerNum: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
 
   // 금액 입력
-  amountSection: { gap: 4, paddingTop: 10, paddingBottom: 6 },
+  amountSection: { gap: 6, paddingTop: 4, paddingBottom: 0 },
   amountHint: { fontFamily: fonts.regular, fontSize: 12, color: colors.inactive },
   amountInputRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
-  amountPrefix: { fontFamily: fonts.bold, fontSize: 34, color: colors.text, marginRight: 2, letterSpacing: -1 },
+  amountPrefix: { fontFamily: undefined, fontSize: 34, color: colors.text, marginRight: 2, letterSpacing: 0 },
   amountInput: {
     flex: 1,
     fontFamily: fonts.bold, fontSize: 34, color: colors.text,
-    letterSpacing: -1, paddingHorizontal: 0, paddingVertical: 4, textAlignVertical: 'center',
+    letterSpacing: 0, paddingHorizontal: 0, paddingVertical: 4, textAlignVertical: 'center',
   },
 
   cardDivider: { height: 1, backgroundColor: colors.border },
@@ -687,8 +752,8 @@ const styles = StyleSheet.create({
   memoField: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8,
     backgroundColor: colors.background, borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 12,
-    minHeight: 60,
+    paddingHorizontal: 14, paddingVertical: 16,
+    minHeight: 64,
   },
   memoInput: {
     flex: 1,
@@ -765,4 +830,29 @@ const styles = StyleSheet.create({
   notiiDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
   notiiMsg: { fontFamily: fonts.regular, fontSize: 14, color: colors.text, lineHeight: 20 },
   notiiTime: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+
+  // 웰컴 팝업
+  welcomeOverlay: {
+    flex: 1, backgroundColor: 'rgba(26,25,24,0.55)',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28,
+  },
+  welcomeCard: {
+    width: '100%', backgroundColor: colors.white,
+    borderRadius: 28, padding: 36, alignItems: 'center', gap: 14,
+  },
+  welcomeEmoji: { fontSize: 56, textAlign: 'center' },
+  welcomeTitle: {
+    fontFamily: fonts.bold, fontSize: 22, color: colors.text,
+    letterSpacing: -0.5, textAlign: 'center',
+  },
+  welcomeSub: {
+    fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary,
+    textAlign: 'center', lineHeight: 22,
+  },
+  welcomeBtn: {
+    width: '100%', height: 52, backgroundColor: colors.primary,
+    borderRadius: 100, alignItems: 'center', justifyContent: 'center',
+    marginTop: 6,
+  },
+  welcomeBtnText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.white },
 });

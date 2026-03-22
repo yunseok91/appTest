@@ -1,26 +1,100 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
-  ScrollView, Switch, Image, Modal, TextInput, Alert,
+  View, Text, TouchableOpacity, StyleSheet, StatusBar,
+  ScrollView, Switch, Image, Modal, TextInput, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as Sharing from 'expo-sharing';
+import { File, Paths } from 'expo-file-system';
 import { colors, fonts } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useProfile } from '../context/ProfileContext';
+import { useAuth } from '../context/AuthContext';
+import { useTransactions } from '../context/TransactionContext';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+const CATEGORY_KR: Record<string, string> = {
+  food: '식비', cafe: '카페', transport: '교통', shopping: '쇼핑',
+  entertainment: '여가', health: '건강', beauty: '미용', education: '교육',
+  travel: '여행', pet: '반려동물', home: '생활', gift: '선물',
+  salary: '급여', allowance: '용돈', interest: '이자', other: '기타',
+};
+
+function buildCSV(transactions: import('../context/TransactionContext').Transaction[], year: number): string {
+  const rows = transactions
+    .filter(tx => tx.date.startsWith(String(year)))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const header = ['날짜', '구분', '카테고리', '금액', '메모', '결제수단', '카드명', '담당자', '시간대'].join(',');
+  const lines = rows.map(tx => [
+    tx.date,
+    tx.type === 'expense' ? '지출' : '수입',
+    CATEGORY_KR[tx.categoryKey] ?? tx.category,
+    tx.amount,
+    `"${(tx.memo ?? '').replace(/"/g, '""')}"`,
+    tx.payMethod === 'cash' ? '현금' : '카드',
+    tx.cardName ?? '',
+    tx.person,
+    tx.time,
+  ].join(','));
+
+  return '\uFEFF' + [header, ...lines].join('\n'); // BOM for Excel UTF-8
+}
+
 export default function MyPageScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
-  const { budget, setBudget, cards, addCard, deleteCard } = useProfile();
+  const { budget, setBudget, cards, addCard, deleteCard, myName, myGender } = useProfile();
+  const { signOut, deleteAccount, disconnectPartner, householdId, partnerName, partnerGender } = useAuth();
+  const { transactions } = useTransactions();
+  const now = new Date();
+  const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthlyExpense = transactions
+    .filter(tx => tx.type === 'expense' && tx.date.startsWith(monthStr))
+    .reduce((s, tx) => s + tx.amount, 0);
+  const isOverBudget = budget > 0 && monthlyExpense > budget;
   const [notifOn, setNotifOn] = useState(true);
   const [showCardAdd, setShowCardAdd] = useState(false);
   const [newAlias, setNewAlias] = useState('');
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [showDisconnect, setShowDisconnect] = useState(false);
   const [showBudgetEdit, setShowBudgetEdit] = useState(false);
   const [budgetInput, setBudgetInput] = useState('');
+  const [showExport, setShowExport] = useState(false);
+  const [exportYear, setExportYear] = useState(new Date().getFullYear());
+  const [exporting, setExporting] = useState(false);
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
+
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('공유 불가', '이 기기에서는 파일 공유가 지원되지 않습니다.');
+        setExporting(false);
+        return;
+      }
+      const csv = buildCSV(transactions, exportYear);
+      const file = new File(Paths.cache, `baebae_${exportYear}.csv`);
+      file.write(csv);
+      await Sharing.shareAsync(file.uri, {
+        mimeType: 'text/csv',
+        dialogTitle: `BaeBae ${exportYear}년 거래내역`,
+      });
+      setShowExport(false);
+    } catch (e) {
+      Alert.alert('오류', '내보내기 중 오류가 발생했습니다.');
+    }
+    setExporting(false);
+  };
 
   const handleAddCard = async () => {
     if (!newAlias.trim()) return;
@@ -30,10 +104,10 @@ export default function MyPageScreen() {
   };
 
   const handleSaveBudget = async () => {
-    const v = Number(budgetInput.replace(/[^0-9]/g, ''));
-    if (!v) return;
+    const v = budgetInput.trim() === '' ? 0 : Number(budgetInput.replace(/[^0-9]/g, ''));
     await setBudget(v);
     setShowBudgetEdit(false);
+    Alert.alert('완료', `이번 달 예산이 ₩${v.toLocaleString()}으로 설정되었습니다.`);
   };
 
   const SectionHeader = ({ title }: { title: string }) => (
@@ -43,61 +117,90 @@ export default function MyPageScreen() {
   );
 
   const MenuItem = ({
-    icon, label, right, onPress, disabled,
+    icon, label, right, onPress, disabled, color,
   }: {
     icon: keyof typeof Ionicons.glyphMap;
     label: string;
     right?: React.ReactNode;
     onPress?: () => void;
     disabled?: boolean;
+    color?: string;
   }) => (
     <TouchableOpacity
       style={[styles.menuItem, disabled && styles.menuItemDisabled]}
       onPress={disabled ? undefined : onPress}
       activeOpacity={disabled ? 1 : 0.7}
     >
-      <Ionicons name={icon} size={20} color={disabled ? colors.textMuted : colors.text} style={{ width: 24 }} />
-      <Text style={[styles.menuLabel, disabled && { color: colors.textMuted }]}>{label}</Text>
+      <Ionicons name={icon} size={20} color={disabled ? colors.textMuted : (color ?? colors.text)} style={{ width: 24 }} />
+      <Text style={[styles.menuLabel, disabled && { color: colors.textMuted }, color ? { color } : {}]}>{label}</Text>
       {right ?? <Ionicons name="chevron-forward" size={16} color={disabled ? colors.border : colors.textMuted} />}
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} translucent={false} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}>
 
         {/* Header */}
         <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>마이페이지</Text>
-          <Ionicons name="settings-outline" size={22} color={colors.text} />
+          <Text style={styles.pageTitle} allowFontScaling={false}>마이페이지</Text>
         </View>
 
         {/* Couple card */}
         <View style={styles.coupleCard}>
           <View style={styles.avatarsRow}>
-            <View style={[styles.bigAv, { backgroundColor: '#f2d9e1' }]}>
-              <Image source={require('../../assets/avatars/HMHJX.png')} style={styles.avImg} resizeMode="contain" />
+            <View style={[styles.bigAv, { backgroundColor: myGender === 'female' ? '#f2d9e1' : '#cbdfee' }]}>
+              <Image
+                source={myGender === 'female'
+                  ? require('../../assets/avatars/HMHJX.png')
+                  : require('../../assets/avatars/aRbFP.png')}
+                style={styles.avImg}
+                resizeMode="contain"
+              />
             </View>
             <Ionicons name="heart" size={16} color={colors.secondary} />
-            <View style={[styles.bigAv, { backgroundColor: '#cbdfee' }]}>
-              <Image source={require('../../assets/avatars/aRbFP.png')} style={styles.avImg} resizeMode="contain" />
-            </View>
+            {partnerGender ? (
+              <View style={[styles.bigAv, { backgroundColor: partnerGender === 'female' ? '#f2d9e1' : '#cbdfee' }]}>
+                <Image
+                  source={partnerGender === 'female'
+                    ? require('../../assets/avatars/HMHJX.png')
+                    : require('../../assets/avatars/aRbFP.png')}
+                  style={styles.avImg}
+                  resizeMode="contain"
+                />
+              </View>
+            ) : (
+              <View style={[styles.bigAv, { backgroundColor: '#E8E8E8' }]}>
+                <Ionicons name="person-outline" size={24} color={colors.textMuted} />
+              </View>
+            )}
           </View>
-          <Text style={styles.coupleName}>민지 &amp; 준호</Text>
-          <Text style={styles.coupleSub}>2023년 1월 1일부터 함께 ✨</Text>
+          <Text style={styles.coupleName} allowFontScaling={false}>{myName || '나'} & {partnerName || '파트너'}</Text>
+          <Text style={styles.coupleSub}>{partnerName ? `${partnerName}님과 함께 기록 중이에요 💑` : '파트너와 연결하면 함께 관리해요 ✨'}</Text>
         </View>
 
         {/* Budget card */}
         <View style={styles.budgetCard}>
           <View style={styles.budgetLeft}>
             <Text style={styles.budgetLbl}>이번 달 예산</Text>
-            <Text style={styles.budgetAmt}>₩{budget.toLocaleString()}</Text>
+            {budget === 0 ? (
+              <Text style={[styles.budgetAmt, { color: colors.inactive }]} allowFontScaling={false}>미설정</Text>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.budgetAmt} allowFontScaling={false}>₩{budget.toLocaleString()}</Text>
+                {isOverBudget && (
+                  <View style={styles.overBudgetBadge}>
+                    <Text style={styles.overBudgetBadgeText}>이번달 초과</Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
           <TouchableOpacity
             style={styles.budgetEditBtn}
             activeOpacity={0.8}
-            onPress={() => { setBudgetInput(String(budget)); setShowBudgetEdit(true); }}
+            onPress={() => { setBudgetInput(budget > 0 ? String(budget) : ''); setShowBudgetEdit(true); }}
           >
             <Text style={styles.budgetEditText}>수정</Text>
           </TouchableOpacity>
@@ -134,7 +237,21 @@ export default function MyPageScreen() {
           <SectionHeader title="파트너 & 가계" />
           <MenuItem icon="pencil-outline" label="가계명 변경" onPress={() => navigation.navigate('RenameHousehold')} />
           <View style={styles.divider} />
-          <MenuItem icon="person-add-outline" label="파트너 초대" />
+          {householdId ? (
+            <MenuItem icon="person-remove-outline" label="파트너 연결 끊기" onPress={() => setShowDisconnect(true)} color="#C47B6A" />
+          ) : (
+            <MenuItem icon="person-add-outline" label="파트너 초대" onPress={() => navigation.getParent()?.navigate('PartnerInvite')} />
+          )}
+        </View>
+
+        {/* 데이터 */}
+        <View style={styles.sectionCard}>
+          <SectionHeader title="데이터" />
+          <MenuItem
+            icon="download-outline"
+            label="내역 내보내기 (CSV)"
+            onPress={() => { setExportYear(currentYear); setShowExport(true); }}
+          />
         </View>
 
         {/* 앱 설정 */}
@@ -184,7 +301,7 @@ export default function MyPageScreen() {
             style={styles.menuItem}
             onPress={() => Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
               { text: '취소', style: 'cancel' },
-              { text: '로그아웃', style: 'destructive' },
+              { text: '로그아웃', style: 'destructive', onPress: () => signOut() },
             ])}
             activeOpacity={0.7}
           >
@@ -198,67 +315,138 @@ export default function MyPageScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={{ height: 8 }} />
       </ScrollView>
 
       {/* 카드 추가 Bottom Sheet */}
       <Modal visible={showCardAdd} animationType="slide" transparent onRequestClose={() => setShowCardAdd(false)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowCardAdd(false)} />
-        <View style={styles.cardSheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>카드 추가</Text>
-          <View style={styles.cardInputRow}>
-            <Ionicons name="card-outline" size={18} color={colors.textSecondary} />
-            <TextInput
-              style={styles.cardInput}
-              value={newAlias}
-              onChangeText={setNewAlias}
-              placeholder="카드 별칭 입력 (예: 내 신한카드)"
-              placeholderTextColor={colors.textMuted}
-              returnKeyType="done"
-              onSubmitEditing={handleAddCard}
-              autoFocus
-            />
+        <KeyboardAvoidingView style={styles.sheetKav} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowCardAdd(false)} />
+          <View style={styles.cardSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>카드 추가</Text>
+            <View style={styles.cardInputRow}>
+              <Ionicons name="card-outline" size={18} color={colors.textSecondary} />
+              <TextInput
+                style={styles.cardInput}
+                value={newAlias}
+                onChangeText={setNewAlias}
+                placeholder="카드 별칭 입력 (예: 내 신한카드)"
+                placeholderTextColor={colors.textMuted}
+                returnKeyType="done"
+                onSubmitEditing={handleAddCard}
+                autoFocus
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.addBtn, !newAlias.trim() && { opacity: 0.4 }]}
+              onPress={handleAddCard}
+              disabled={!newAlias.trim()}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.addBtnText}>추가하기</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.addBtn, !newAlias.trim() && { opacity: 0.4 }]}
-            onPress={handleAddCard}
-            disabled={!newAlias.trim()}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.addBtnText}>추가하기</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* 예산 수정 Bottom Sheet */}
       <Modal visible={showBudgetEdit} animationType="slide" transparent onRequestClose={() => setShowBudgetEdit(false)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowBudgetEdit(false)} />
-        <View style={styles.cardSheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>예산 수정</Text>
-          <View style={styles.cardInputRow}>
-            <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: colors.text }}>₩</Text>
-            <TextInput
-              style={styles.cardInput}
-              value={budgetInput ? Number(budgetInput).toLocaleString('ko-KR') : ''}
-              onChangeText={(t) => setBudgetInput(t.replace(/[^0-9]/g, ''))}
-              placeholder="예산 금액 입력"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="number-pad"
-              returnKeyType="done"
-              onSubmitEditing={handleSaveBudget}
-              autoFocus
-            />
+        <KeyboardAvoidingView style={styles.sheetKav} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowBudgetEdit(false)} />
+          <View style={styles.cardSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>예산 수정</Text>
+            <View style={styles.cardInputRow}>
+              <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: colors.text }}>₩</Text>
+              <TextInput
+                style={styles.cardInput}
+                value={budgetInput !== '' ? Number(budgetInput).toLocaleString('ko-KR') : ''}
+                onChangeText={(t) => setBudgetInput(t.replace(/[^0-9]/g, ''))}
+                placeholder="예산 금액 입력"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                onSubmitEditing={handleSaveBudget}
+                autoFocus
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={handleSaveBudget}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.addBtnText}>저장하기</Text>
+            </TouchableOpacity>
           </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* 내역 내보내기 Bottom Sheet */}
+      <Modal visible={showExport} animationType="slide" transparent onRequestClose={() => setShowExport(false)}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowExport(false)} />
+        <View style={styles.exportSheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>내역 내보내기</Text>
+
+          {/* 연도 선택 */}
+          <Text style={styles.exportLabel}>연도 선택</Text>
+          <View style={styles.yearRow}>
+            {yearOptions.map(y => (
+              <TouchableOpacity
+                key={y}
+                style={[styles.yearBtn, exportYear === y && styles.yearBtnActive]}
+                onPress={() => setExportYear(y)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.yearBtnText, exportYear === y && styles.yearBtnTextActive]}>
+                  {y}년
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <TouchableOpacity
-            style={[styles.addBtn, !budgetInput.trim() && { opacity: 0.4 }]}
-            onPress={handleSaveBudget}
-            disabled={!budgetInput.trim()}
+            style={[styles.addBtn, exporting && { opacity: 0.4 }]}
+            onPress={handleExport}
+            disabled={exporting}
             activeOpacity={0.85}
           >
-            <Text style={styles.addBtnText}>저장하기</Text>
+            {exporting
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.addBtnText}>공유하기</Text>
+            }
           </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* 파트너 연결 끊기 Modal */}
+      <Modal visible={showDisconnect} animationType="fade" transparent onRequestClose={() => setShowDisconnect(false)}>
+        <View style={styles.withdrawOverlay}>
+          <View style={styles.withdrawCard}>
+            <Ionicons name="heart-dislike-outline" size={40} color="#C47B6A" style={{ marginBottom: 8 }} />
+            <Text style={styles.withdrawTitle}>파트너 연결을 끊겠습니까?</Text>
+            <Text style={styles.withdrawSub}>파트너 데이터는 삭제됩니다.{'\n'}이 작업은 되돌릴 수 없습니다.</Text>
+            <View style={styles.withdrawBtns}>
+              <TouchableOpacity style={styles.withdrawCancel} onPress={() => setShowDisconnect(false)} activeOpacity={0.8}>
+                <Text style={styles.withdrawCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.withdrawConfirm}
+                onPress={async () => {
+                  try {
+                    await disconnectPartner();
+                    setShowDisconnect(false);
+                  } catch (err: any) {
+                    setShowDisconnect(false);
+                    Alert.alert('오류', err?.message ?? '연결 끊기 처리 중 오류가 발생했습니다.');
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.withdrawConfirmText}>연결 끊기</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -273,7 +461,18 @@ export default function MyPageScreen() {
               <TouchableOpacity style={styles.withdrawCancel} onPress={() => setShowWithdraw(false)} activeOpacity={0.8}>
                 <Text style={styles.withdrawCancelText}>취소</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.withdrawConfirm} onPress={() => setShowWithdraw(false)} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.withdrawConfirm}
+                onPress={async () => {
+                  try {
+                    await deleteAccount();
+                  } catch (err: any) {
+                    setShowWithdraw(false);
+                    Alert.alert('탈퇴 실패', err?.message ?? '탈퇴 처리 중 오류가 발생했습니다.');
+                  }
+                }}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.withdrawConfirmText}>탈퇴</Text>
               </TouchableOpacity>
             </View>
@@ -289,7 +488,7 @@ const styles = StyleSheet.create({
   content: { padding: 20, gap: 16 },
 
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 4 },
-  pageTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.text },
+  pageTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 30, color: colors.text },
 
   coupleCard: {
     backgroundColor: colors.card, borderRadius: 20, padding: 20,
@@ -308,9 +507,14 @@ const styles = StyleSheet.create({
   },
   budgetLeft: { gap: 4 },
   budgetLbl: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
-  budgetAmt: { fontFamily: fonts.bold, fontSize: 18, color: colors.text },
+  budgetAmt: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 26, color: colors.text },
   budgetEditBtn: { backgroundColor: colors.canvas, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 8 },
   budgetEditText: { fontFamily: fonts.medium, fontSize: 13, color: colors.text },
+  overBudgetBadge: {
+    backgroundColor: colors.errorLight, borderRadius: 100,
+    paddingHorizontal: 8, paddingVertical: 2,
+  },
+  overBudgetBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, color: colors.error },
 
   sectionCard: { backgroundColor: colors.card, borderRadius: 16, overflow: 'hidden' },
   sectionHdrWrap: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
@@ -324,7 +528,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted,
     backgroundColor: colors.canvas, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100,
   },
-  divider: { height: 1, backgroundColor: colors.canvas },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.canvas },
 
   cardDelBtn: {
     width: 28, height: 28, borderRadius: 8, backgroundColor: '#FFF0F0',
@@ -333,8 +537,8 @@ const styles = StyleSheet.create({
 
   // Card add sheet
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
+  sheetKav: { flex: 1, justifyContent: 'flex-end' },
   cardSheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
     padding: 20, paddingBottom: 36, gap: 16,
   },
@@ -347,6 +551,24 @@ const styles = StyleSheet.create({
   cardInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, color: colors.text },
   addBtn: { backgroundColor: colors.primary, borderRadius: 100, height: 52, alignItems: 'center', justifyContent: 'center' },
   addBtnText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
+
+  kavWrap: { flex: 1, justifyContent: 'flex-end' },
+  exportSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 20, paddingBottom: 36, gap: 16,
+  },
+
+  // Export sheet
+  exportLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary },
+  yearRow: { flexDirection: 'row', gap: 8 },
+  yearBtn: {
+    flex: 1, height: 44, borderRadius: 12, backgroundColor: colors.canvas,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  yearBtnActive: { backgroundColor: colors.primary },
+  yearBtnText: { fontFamily: fonts.medium, fontSize: 14, color: colors.text },
+  yearBtnTextActive: { color: '#fff', fontFamily: fonts.semiBold },
 
   // Withdraw modal
   withdrawOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },

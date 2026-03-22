@@ -1,66 +1,89 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert,
+  View, Text, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator, Alert, Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { colors, fonts } from '../theme/colors';
 import GoogleIcon from '../components/GoogleIcon';
 import BaeBaeMark from '../components/BaeBaeMark';
-import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
+import { auth } from '../config/firebase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// ⚠️ Google Cloud Console에서 발급받은 Client ID를 입력하세요
-// iOS: https://console.cloud.google.com → Credentials → iOS 타입 생성 (번들 ID: com.baebae.app)
-const GOOGLE_CLIENT_IDS = {
-  iosClientId: '306132751951-lql1gl5lveganp301s5igvibkkmac6h7.apps.googleusercontent.com',
-  // androidClientId: 'TODO: EAS 빌드 시 추가',
-  webClientId: '306132751951-o6gqrfvftfovq9f2a96h8c85ktqsgsr1.apps.googleusercontent.com',
-};
-
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Login'>;
+const WEB_CLIENT_ID = '476537137658-v8a134ljp7fkkgivbpg1vk2bg58vltb0.apps.googleusercontent.com';
 
 export default function LoginScreen() {
-  const navigation = useNavigation<Nav>();
   const { signIn } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  const [request, response, promptAsync] = Google.useAuthRequest(GOOGLE_CLIENT_IDS);
+  // iOS (Expo Go) — auth.expo.io 프록시 방식
+  const redirectUri = 'https://auth.expo.io/@leeyunseok/baebae-app';
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: WEB_CLIENT_ID,
+    webClientId: WEB_CLIENT_ID,
+    redirectUri,
+  });
 
   useEffect(() => {
     if (response?.type === 'success') {
-      handleGoogleResponse(response.authentication?.accessToken);
+      handleAccessToken(response.authentication?.accessToken);
     } else if (response?.type === 'error') {
       setLoading(false);
       Alert.alert('로그인 실패', response.error?.message ?? '다시 시도해 주세요.');
-    } else if (response?.type === 'dismiss') {
+    } else if (response?.type === 'dismiss' || response?.type === 'cancel') {
       setLoading(false);
     }
   }, [response]);
 
-  const handleGoogleResponse = async (accessToken?: string) => {
-    if (!accessToken) {
-      setLoading(false);
-      return;
-    }
+  const handleAccessToken = async (accessToken?: string) => {
+    if (!accessToken) { setLoading(false); return; }
     try {
-      const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const userInfo = await res.json();
+      const credential = GoogleAuthProvider.credential(null, accessToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      const fbUser = userCredential.user;
       await signIn({
-        id: userInfo.id,
-        name: userInfo.name,
-        email: userInfo.email,
-        picture: userInfo.picture,
+        id: fbUser.uid,
+        name: fbUser.displayName ?? '사용자',
+        email: fbUser.email ?? '',
+        picture: fbUser.photoURL ?? '',
       });
-      navigation.navigate('CoupleIcon');
-    } catch {
-      Alert.alert('로그인 실패', '사용자 정보를 불러오지 못했어요.');
+    } catch (e: any) {
+      console.warn('[Login] Firebase error:', e?.code, e?.message);
+      Alert.alert('로그인 실패', '다시 시도해 주세요.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNativeAndroid = async () => {
+    try {
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      GoogleSignin.configure({ webClientId: WEB_CLIENT_ID });
+      await GoogleSignin.hasPlayServices();
+      try { await GoogleSignin.signOut(); } catch {}
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.idToken ?? userInfo.data?.idToken;
+      if (!idToken) throw new Error('idToken not found');
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      const fbUser = userCredential.user;
+      await signIn({
+        id: fbUser.uid,
+        name: fbUser.displayName ?? '사용자',
+        email: fbUser.email ?? '',
+        picture: fbUser.photoURL ?? '',
+      });
+    } catch (e: any) {
+      try {
+        const { statusCodes } = require('@react-native-google-signin/google-signin');
+        if (e.code === statusCodes.SIGN_IN_CANCELLED) return;
+      } catch {}
+      console.warn('[Login] Android error:', e?.code, e?.message);
+      Alert.alert('로그인 실패', '다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
@@ -68,36 +91,37 @@ export default function LoginScreen() {
 
   const handlePress = async () => {
     setLoading(true);
-    await promptAsync();
+    if (Platform.OS === 'android') {
+      await handleNativeAndroid();
+    } else {
+      await promptAsync();
+    }
   };
 
   const handleDevBypass = async () => {
     await signIn({ id: 'dev-001', name: '개발자', email: 'dev@baebae.app', picture: '' });
-    navigation.navigate('CoupleIcon');
   };
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} translucent={false} />
       <View style={styles.container}>
-        {/* Top section */}
         <View style={styles.topSection}>
           <BaeBaeMark size={114} />
-          <Text style={styles.appTitle}>배배</Text>
+          <Text style={styles.appTitle} allowFontScaling={false}>배배</Text>
           <Text style={styles.appSub}>우리 가족의 가계부</Text>
         </View>
 
-        {/* Bottom section */}
         <View style={styles.bottomSection}>
           <View style={styles.ctaBlock}>
-            <Text style={styles.ctaHeading}>함께 시작해요</Text>
+            <Text style={styles.ctaHeading} allowFontScaling={false}>함께 시작해요</Text>
             <Text style={styles.ctaSub}>소중한 일상을 함께 기록해보세요</Text>
           </View>
 
           <TouchableOpacity
-            style={[styles.googleBtn, (!request || loading) && styles.googleBtnDisabled]}
+            style={[styles.googleBtn, (loading || (Platform.OS !== 'android' && !request)) && styles.googleBtnDisabled]}
             onPress={handlePress}
-            disabled={!request || loading}
+            disabled={loading || (Platform.OS !== 'android' && !request)}
             activeOpacity={0.85}
           >
             {loading ? (
@@ -110,7 +134,6 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* 개발용 우회 버튼 — 배포 전 제거 */}
           {__DEV__ && (
             <TouchableOpacity style={styles.devBtn} onPress={handleDevBypass}>
               <Text style={styles.devBtnText}>🛠 개발 모드 진입</Text>
@@ -127,10 +150,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  safe: { flex: 1, backgroundColor: colors.background },
   container: {
     flex: 1,
     paddingHorizontal: 28,
@@ -138,39 +158,26 @@ const styles = StyleSheet.create({
     paddingBottom: 52,
     justifyContent: 'space-between',
   },
-  topSection: {
-    alignItems: 'center',
-    gap: 16,
-  },
+  topSection: { alignItems: 'center', gap: 16 },
   appTitle: {
     fontFamily: fonts.bold,
     fontSize: 28,
+    lineHeight: 36,
     color: colors.text,
     letterSpacing: -1,
     marginTop: 16,
   },
-  appSub: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  bottomSection: {
-    gap: 20,
-  },
-  ctaBlock: {
-    gap: 8,
-  },
+  appSub: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
+  bottomSection: { gap: 20 },
+  ctaBlock: { gap: 8 },
   ctaHeading: {
     fontFamily: fonts.bold,
     fontSize: 22,
+    lineHeight: 30,
     color: colors.text,
     letterSpacing: -0.5,
   },
-  ctaSub: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
+  ctaSub: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
   googleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -185,27 +192,14 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
-  googleBtnDisabled: {
-    opacity: 0.6,
-  },
-  googleLabel: {
-    fontFamily: fonts.semiBold,
-    fontSize: 16,
-    color: colors.text,
-  },
+  googleBtnDisabled: { opacity: 0.6 },
+  googleLabel: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.text },
   termsNote: {
     fontFamily: fonts.regular,
     fontSize: 11,
     color: colors.textMuted,
     textAlign: 'center',
   },
-  devBtn: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  devBtnText: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
+  devBtn: { alignItems: 'center', paddingVertical: 10 },
+  devBtnText: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
 });

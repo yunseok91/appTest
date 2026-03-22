@@ -1,77 +1,20 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
+  View, Text, TouchableOpacity, StyleSheet, StatusBar,
   Modal, ScrollView, Alert, TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
-
-const ITEM_H = 48;
-const YEARS = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030];
-const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-function WheelPicker({ items, selectedIndex, onSelect, format }: {
-  items: number[];
-  selectedIndex: number;
-  onSelect: (index: number) => void;
-  format?: (v: number) => string;
-}) {
-  const scrollRef = useRef<ScrollView>(null);
-  const label = format ?? ((v: number) => String(v));
-
-  useEffect(() => {
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
-    }, 50);
-  }, [selectedIndex]);
-
-  const handleSnap = (e: any) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
-    const clamped = Math.max(0, Math.min(idx, items.length - 1));
-    onSelect(clamped);
-  };
-
-  return (
-    <View style={styles.wheelOuter}>
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_H}
-        decelerationRate="fast"
-        nestedScrollEnabled
-        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
-        onMomentumScrollEnd={handleSnap}
-        onScrollEndDrag={handleSnap}
-      >
-        {items.map((v, i) => {
-          const dist = Math.abs(i - selectedIndex);
-          const isSelected = dist === 0;
-          const opacity = dist === 0 ? 1 : dist === 1 ? 0.55 : 0.25;
-          const fontSize = dist === 0 ? 17 : dist === 1 ? 15 : 13;
-          const fontWeight = dist === 0 ? fonts.bold : fonts.regular;
-          return (
-            <View key={v} style={[styles.wheelItem, isSelected && styles.wheelItemSelected]}>
-              <Text style={[styles.wheelText, {
-                opacity, fontSize, fontFamily: fontWeight,
-                color: isSelected ? '#FFFFFF' : colors.text,
-              }]}>
-                {label(v)}
-              </Text>
-            </View>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../theme/colors';
 import { useTransactions, type Transaction } from '../context/TransactionContext';
+import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../context/ProfileContext';
+import PhotoViewerModal from '../components/PhotoViewerModal';
+import WheelPicker, { YEARS, MONTHS, ITEM_H } from '../components/WheelPicker';
 
 type TimeSlot = '아침' | '점심' | '저녁';
 const TIME_SLOTS: TimeSlot[] = ['아침', '점심', '저녁'];
 const TIME_EMOJI: Record<TimeSlot, string> = { 아침: '🌅', 점심: '☀️', 저녁: '🌙' };
-import { useAuth } from '../context/AuthContext';
-import PhotoViewerModal from '../components/PhotoViewerModal';
 
 type PersonFilter = 'all' | 'me' | 'partner';
 
@@ -86,8 +29,9 @@ function formatW(amount: number) {
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
   const { transactions, deleteTransaction, updateTransaction } = useTransactions();
-  const { user } = useAuth();
-  const myName = user?.name ?? '나';
+  const { user, partnerName } = useAuth();
+  const { myName: profileName } = useProfile();
+  const myName = profileName || user?.name || '나';
 
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -100,6 +44,7 @@ export default function CalendarScreen() {
   const [editMemo, setEditMemo] = useState('');
   const [editTime, setEditTime] = useState<TimeSlot>('아침');
   const [showYMPicker, setShowYMPicker] = useState(false);
+  const [gridHeight, setGridHeight] = useState(0);
   const [pickYearIdx, setPickYearIdx] = useState(YEARS.indexOf(today.getFullYear()));
   const [pickMonthIdx, setPickMonthIdx] = useState(today.getMonth());
 
@@ -157,7 +102,7 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} translucent={false} />
 
       {/* Header */}
       <View style={styles.header}>
@@ -169,7 +114,7 @@ export default function CalendarScreen() {
           onPress={() => { setPickYearIdx(YEARS.indexOf(year)); setPickMonthIdx(month); setShowYMPicker(true); }}
           activeOpacity={0.8}
         >
-          <Text style={styles.monthTitle}>{year}년 {month + 1}월</Text>
+          <Text style={styles.monthTitle} allowFontScaling={false}>{year}년 {month + 1}월</Text>
           <Ionicons name="chevron-down" size={14} color={colors.text} />
         </TouchableOpacity>
         <TouchableOpacity onPress={nextMonth} style={styles.navBtn}>
@@ -179,7 +124,7 @@ export default function CalendarScreen() {
 
       {/* Filter chips */}
       <View style={styles.filterRow}>
-        {([['all', '전체'], ['me', '나'], ['partner', '파트너']] as [PersonFilter, string][]).map(([key, label]) => (
+        {([['all', '전체'], ['me', myName], ['partner', partnerName || '파트너']] as [PersonFilter, string][]).map(([key, label]) => (
           <TouchableOpacity
             key={key}
             style={[styles.filterChip, filter === key && filterChipActive(key)]}
@@ -205,47 +150,49 @@ export default function CalendarScreen() {
         ))}
       </View>
 
-      {/* Calendar grid */}
-      <ScrollView style={styles.grid} showsVerticalScrollIndicator={false}>
-        <View style={styles.gridInner}>
-          {cells.map((day, idx) => {
-            if (!day) return <View key={`e-${idx}`} style={styles.cell} />;
-            const key = dateKey(day);
-            const total = dayTotal(day);
-            const colIdx = idx % 7;
-            const hasTx = total > 0;
+      {/* Calendar grid — rows fill available height evenly */}
+      <View style={styles.grid} onLayout={(e) => setGridHeight(e.nativeEvent.layout.height)}>
+        {Array.from({ length: cells.length / 7 }, (_, wi) => (
+          <View key={wi} style={[styles.weekRowGrid, gridHeight > 0 && { height: gridHeight / (cells.length / 7) }]}>
+            {cells.slice(wi * 7, wi * 7 + 7).map((day, di) => {
+              const idx = wi * 7 + di;
+              if (!day) return <View key={`e-${idx}`} style={styles.cell} />;
+              const key = dateKey(day);
+              const total = dayTotal(day);
+              const hasTx = total > 0;
 
-            return (
-              <TouchableOpacity
-                key={key}
-                style={[styles.cell, isToday(day) && styles.cellToday]}
-                onPress={() => hasTx && setSelectedDay(key)}
-                activeOpacity={hasTx ? 0.7 : 1}
-              >
-                <Text style={[
-                  styles.dayNum,
-                  colIdx === 0 && { color: '#E05C5C' },
-                  colIdx === 6 && { color: '#4A90D9' },
-                  isToday(day) && styles.dayNumToday,
-                ]}>{day}</Text>
-                {total > 0 && (
-                  <Text style={styles.dayTotal}>{formatW(total)}</Text>
-                )}
-                {hasTx && (
-                  <View style={styles.dotRow}>
-                    {(filter === 'all' || filter === 'me') && hasMe(day) && (
-                      <View style={[styles.personDot, { backgroundColor: '#C4729A' }]} />
-                    )}
-                    {(filter === 'all' || filter === 'partner') && hasPartner(day) && (
-                      <View style={[styles.personDot, { backgroundColor: '#4A90D9' }]} />
-                    )}
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </ScrollView>
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.cell, isToday(day) && styles.cellToday]}
+                  onPress={() => hasTx && setSelectedDay(key)}
+                  activeOpacity={hasTx ? 0.7 : 1}
+                >
+                  <Text style={[
+                    styles.dayNum,
+                    di === 0 && { color: '#E05C5C' },
+                    di === 6 && { color: '#4A90D9' },
+                    isToday(day) && styles.dayNumToday,
+                  ]}>{day}</Text>
+                  {total > 0 && (
+                    <Text style={styles.dayTotal}>{formatW(total)}</Text>
+                  )}
+                  {hasTx && (
+                    <View style={styles.dotRow}>
+                      {(filter === 'all' || filter === 'me') && hasMe(day) && (
+                        <View style={[styles.personDot, { backgroundColor: '#C4729A' }]} />
+                      )}
+                      {(filter === 'all' || filter === 'partner') && hasPartner(day) && (
+                        <View style={[styles.personDot, { backgroundColor: '#4A90D9' }]} />
+                      )}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ))}
+      </View>
 
       {/* Day detail modal */}
       <Modal visible={!!selectedDay} animationType="slide" transparent onRequestClose={() => setSelectedDay(null)}>
@@ -281,7 +228,7 @@ export default function CalendarScreen() {
                       <Text style={styles.txMemo}>{tx.memo}</Text>
                     </View>
                     <View style={styles.txRight}>
-                      <Text style={styles.txAmount}>₩{tx.amount.toLocaleString()}</Text>
+                      <Text style={styles.txAmount} allowFontScaling={false}>₩{tx.amount.toLocaleString()}</Text>
                       <Ionicons name="chevron-forward" size={14} color={colors.inactive} />
                     </View>
                   </TouchableOpacity>
@@ -328,7 +275,7 @@ export default function CalendarScreen() {
                     <Text style={styles.expenseTagText}>지출</Text>
                   </View>
                 </View>
-                <Text style={styles.detailAmt}>₩{selectedTx.amount.toLocaleString()}</Text>
+                <Text style={styles.detailAmt} allowFontScaling={false}>₩{selectedTx.amount.toLocaleString()}</Text>
               </View>
 
               <View style={styles.detailDivider} />
@@ -479,8 +426,9 @@ export default function CalendarScreen() {
 
       {/* Year/Month Picker Modal */}
       <Modal visible={showYMPicker} animationType="slide" transparent onRequestClose={() => setShowYMPicker(false)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowYMPicker(false)} />
-        <View style={[styles.ymSheet, { paddingBottom: insets.bottom + 20 }]}>
+        <View style={styles.ymModalWrap}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowYMPicker(false)} />
+          <View style={[styles.ymSheet, { paddingBottom: insets.bottom + 20 }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.ymHeader}>
             <Text style={styles.ymTitle}>날짜 선택</Text>
@@ -500,6 +448,7 @@ export default function CalendarScreen() {
           >
             <Text style={styles.ymConfirmText}>확인</Text>
           </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -519,7 +468,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
   navBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   monthTitleBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.canvas },
-  monthTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
+  monthTitle: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 24, color: colors.text },
 
   filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
   filterChip: {
@@ -534,10 +483,12 @@ const styles = StyleSheet.create({
   weekDay: { flex: 1, textAlign: 'center', fontFamily: fonts.semiBold, fontSize: 11, color: colors.textSecondary },
 
   grid: { flex: 1 },
-  gridInner: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 4 },
-  cell: {
-    width: '14.28%', minHeight: 68, padding: 5,
+  weekRowGrid: {
+    flexDirection: 'row',
     borderTopWidth: 1, borderTopColor: colors.border,
+  },
+  cell: {
+    flex: 1, padding: 5,
     alignItems: 'flex-start',
   },
   cellToday: { backgroundColor: '#EDF5F0' },
@@ -585,19 +536,17 @@ const styles = StyleSheet.create({
   editSaveBtnText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
 
   // Year/Month picker bottom sheet
-  ymSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  ymModalWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.3)' },
+  ymSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   ymHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, paddingHorizontal: 20 },
   ymTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
-  ymDivider: { height: 1, backgroundColor: colors.border },
+  ymDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   ymPickerRow: { flexDirection: 'row', height: ITEM_H * 5, marginTop: 8 },
   ymConfirmBtn: { marginHorizontal: 20, marginTop: 16, backgroundColor: colors.primary, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
   ymConfirmText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
 
   // Wheel picker
-  wheelOuter: { flex: 1, overflow: 'hidden' },
-  wheelItem: { height: ITEM_H, alignItems: 'center', justifyContent: 'center', marginHorizontal: 8 },
-  wheelItemSelected: { backgroundColor: colors.primary, borderRadius: 12 },
-  wheelText: { color: colors.text },
+  // WheelPicker styles are in ../components/WheelPicker.tsx
 
   filterTextActive: {} as any,
 
@@ -615,8 +564,8 @@ const styles = StyleSheet.create({
   detailTypeRow: { flexDirection: 'row' },
   expenseTag: { backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   expenseTagText: { fontFamily: fonts.medium, fontSize: 11, color: '#E05C5C' },
-  detailAmt: { fontFamily: fonts.bold, fontSize: 34, color: colors.text, letterSpacing: -1 },
-  detailDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
+  detailAmt: { fontFamily: fonts.bold, fontSize: 34, lineHeight: 42, color: colors.text, letterSpacing: -1 },
+  detailDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 4 },
   detailPhoto: { width: '100%', height: 180, borderRadius: 12, marginVertical: 4 },
   photoExpandBtn: {
     position: 'absolute', bottom: 12, right: 8,

@@ -11,12 +11,26 @@ import {
   Outfit_700Bold,
 } from '@expo-google-fonts/outfit';
 import AppNavigator from './src/navigation/AppNavigator';
-import { AuthProvider } from './src/context/AuthContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { TransactionProvider } from './src/context/TransactionContext';
 import { ProfileProvider } from './src/context/ProfileContext';
 import SplashScreenView from './src/screens/SplashScreenView';
+import { navigationRef } from './src/navigation/navigationRef';
 
 SplashScreen.preventAutoHideAsync();
+
+// user.id가 바뀔 때 ProfileProvider/TransactionProvider를 remount → 인메모리 state 완전 초기화
+function DataProviders({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const key = user?.id ?? 'guest';
+  return (
+    <ProfileProvider key={key}>
+      <TransactionProvider key={key}>
+        {children}
+      </TransactionProvider>
+    </ProfileProvider>
+  );
+}
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -37,19 +51,17 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <ProfileProvider>
-        <TransactionProvider>
-          <SafeAreaProvider>
-            <NavigationContainer>
-              <StatusBar style="dark" />
-              <AppNavigator />
-              {showSplash && (
-                <SplashScreenView onFinish={() => setShowSplash(false)} />
-              )}
-            </NavigationContainer>
-          </SafeAreaProvider>
-        </TransactionProvider>
-      </ProfileProvider>
+      <DataProviders>
+        <SafeAreaProvider>
+          <NavigationContainer ref={navigationRef}>
+            <StatusBar style="dark" />
+            <AppNavigator />
+            {showSplash && (
+              <SplashScreenView onFinish={() => setShowSplash(false)} />
+            )}
+          </NavigationContainer>
+        </SafeAreaProvider>
+      </DataProviders>
     </AuthProvider>
   );
 }

@@ -4,28 +4,66 @@
     "slug": "baebae-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/ios_icon.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#F7F3EE",
     "splash": {
-      "image": "./assets/CYaV3.png",
-      "resizeMode": "cover",
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#F7F3EE"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.baebae.app",
-      "icon": "./assets/ios_icon.png"
+      "icon": "./assets/icon.png",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/ios_icon.png",
-        "backgroundColor": "#F5F4F0"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#F7F3EE"
       },
-      "package": "com.baebae.app"
+      "package": "com.baebae.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "baebae"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "scheme": "baebae",
+    "updates": {
+      "url": "https://u.expo.dev/90334bb5-9d3c-4888-9731-e89f4c925932"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "plugins": [
-      "expo-web-browser"
-    ]
+      "expo-web-browser",
+      "expo-mail-composer",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.476537137658-iko16ukbpt14to4ot4enkeotbrlrjbtn"
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "90334bb5-9d3c-4888-9731-e89f4c925932"
+      }
+    },
+    "owner": "leeyunseok"
   }
 }

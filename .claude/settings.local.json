@@ -3,7 +3,19 @@
     "allow": [
       "Bash(python3 -c \":*)",
       "Bash(npm install:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const fs = require\\(''expo-file-system''\\); console.log\\(Object.keys\\(fs\\).slice\\(0,20\\)\\)\")",
+      "Bash(grep -rn \"from ''react-native-safe-area-context''\" \"c:/스터디/appTest/BaeBaeApp/src/screens/\")",
+      "Bash(grep -n \"translucent={false}\" c:/스터디/appTest/BaeBaeApp/src/screens/*.tsx)",
+      "Bash(grep -n \"allowFontScaling={false}\" c:/스터디/appTest/BaeBaeApp/src/screens/*.tsx)",
+      "Bash(npx eas-cli:*)",
+      "Bash(CI=1 EAS_NO_VCS=1 npx eas-cli update --branch preview --message \"파트너 연결 수정 — inviteCode Firestore 미반영 버그\" --non-interactive)",
+      "Bash(CI=1 EAS_NO_VCS=1 npx eas-cli update --branch preview --message \"초대코드 하이픈 무관하게 매칭\" --non-interactive)",
+      "Bash(CI=1 EAS_NO_VCS=1 npx eas-cli update --branch preview --message \"초대코드 실패 이유 표시\" --non-interactive)",
+      "Bash(CI=1 EAS_NO_VCS=1 npx eas-cli update --branch preview --message \"Google 로그인 매번 계정 선택창 표시\" --non-interactive)",
+      "Bash(CI=1 EAS_NO_VCS=1 npx eas-cli build --platform android --profile preview --non-interactive)",
+      "Bash(CI=1 EAS_NO_VCS=1 npx eas-cli update --branch preview --message \"파트너 연결 — inviteCode fallback + household 없을 때 자동 생성\" --non-interactive)",
+      "Bash(taskkill /PID 14228 /F)"
     ]
   }
 }

@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Image,
+  View, Text, TouchableOpacity, StyleSheet, StatusBar, Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { useProfile } from '../context/ProfileContext';
+import { useAuth } from '../context/AuthContext';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'CoupleIcon'>;
 
@@ -29,13 +32,24 @@ const ICONS = [
 
 export default function CoupleIconScreen() {
   const navigation = useNavigation<Nav>();
+  const { setMyGender } = useProfile();
+  const { signOut } = useAuth();
   const [selected, setSelected] = useState<'male' | 'female'>('male');
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} translucent={false} />
       <View style={styles.statusRow}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={async () => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              await signOut();
+            }
+          }}
+          style={styles.backBtn}
+        >
           <Ionicons name="chevron-back" size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -43,7 +57,7 @@ export default function CoupleIconScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.step}>1 / 3 단계</Text>
-          <Text style={styles.title}>나는 누구인가요?</Text>
+          <Text style={styles.title} allowFontScaling={false}>나는 누구인가요?</Text>
           <Text style={styles.sub}>연인 중 내 역할을 선택해 주세요</Text>
         </View>
 
@@ -55,7 +69,7 @@ export default function CoupleIconScreen() {
           {ICONS.map((item) => (
             <TouchableOpacity
               key={item.key}
-              style={styles.iconWrap}
+              style={[styles.iconWrap, selected !== item.key && { opacity: 0.35 }]}
               onPress={() => setSelected(item.key)}
               activeOpacity={0.8}
             >
@@ -77,7 +91,10 @@ export default function CoupleIconScreen() {
 
         <TouchableOpacity
           style={styles.nextBtn}
-          onPress={() => navigation.navigate('ProfileSetup', { type: 'couple', gender: selected })}
+          onPress={async () => {
+            await setMyGender(selected);
+            navigation.navigate('ProfileSetup', { type: 'couple', gender: selected });
+          }}
           activeOpacity={0.85}
         >
           <Text style={styles.nextBtnText}>다음</Text>
@@ -97,7 +114,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 48, gap: 24 },
   header: { gap: 8 },
   step: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.primary },
-  title: { fontFamily: fonts.bold, fontSize: 24, color: colors.text, letterSpacing: -0.5 },
+  title: { fontFamily: fonts.bold, fontSize: 24, lineHeight: 32, color: colors.text, letterSpacing: -0.5 },
   sub: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
   chip: {
     height: 32, paddingHorizontal: 16, borderRadius: 100,

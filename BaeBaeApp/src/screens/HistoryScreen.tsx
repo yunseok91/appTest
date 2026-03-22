@@ -1,79 +1,20 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
+  View, Text, TouchableOpacity, StyleSheet, StatusBar,
   ScrollView, Modal, Alert, TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../theme/colors';
 import { useTransactions, type Transaction } from '../context/TransactionContext';
 import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../context/ProfileContext';
 import PhotoViewerModal from '../components/PhotoViewerModal';
+import WheelPicker, { YEARS, MONTHS, ITEM_H } from '../components/WheelPicker';
 
 type TimeSlot = '아침' | '점심' | '저녁';
 const TIME_SLOTS: TimeSlot[] = ['아침', '점심', '저녁'];
 const TIME_EMOJI: Record<TimeSlot, string> = { 아침: '🌅', 점심: '☀️', 저녁: '🌙' };
-
-const ITEM_H = 48;
-const YEARS = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030];
-const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-function WheelPicker({ items, selectedIndex, onSelect, format }: {
-  items: number[];
-  selectedIndex: number;
-  onSelect: (index: number) => void;
-  format?: (v: number) => string;
-}) {
-  const scrollRef = useRef<ScrollView>(null);
-  const label = format ?? ((v: number) => String(v));
-
-  useEffect(() => {
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
-    }, 50);
-  }, [selectedIndex]);
-
-  const handleSnap = (e: any) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
-    const clamped = Math.max(0, Math.min(idx, items.length - 1));
-    onSelect(clamped);
-  };
-
-  return (
-    <View style={styles.wheelOuter}>
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_H}
-        decelerationRate="fast"
-        nestedScrollEnabled
-        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
-        onMomentumScrollEnd={handleSnap}
-        onScrollEndDrag={handleSnap}
-      >
-        {items.map((v, i) => {
-          const dist = Math.abs(i - selectedIndex);
-          const isSelected = dist === 0;
-          const opacity = dist === 0 ? 1 : dist === 1 ? 0.55 : 0.25;
-          const fontSize = dist === 0 ? 17 : dist === 1 ? 15 : 13;
-          const fontWeight = dist === 0 ? fonts.bold : fonts.regular;
-          return (
-            <View key={v} style={[styles.wheelItem, isSelected && styles.wheelItemSelected]}>
-              <Text style={[styles.wheelText, {
-                opacity,
-                fontSize,
-                fontFamily: fontWeight,
-                color: isSelected ? '#FFFFFF' : colors.text,
-              }]}>
-                {label(v)}
-              </Text>
-            </View>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
 
 function getDateLabel(dateStr: string): string {
   const today = new Date();
@@ -98,9 +39,15 @@ function TxRow({ tx, onPress }: { tx: Transaction; onPress: () => void }) {
         <View style={styles.txMeta}>
           <Text style={styles.txMetaText}>{tx.time} · {tx.category} · </Text>
           <Text style={[styles.txMetaName, { color: colors.primary }]}>{tx.person}</Text>
+          <Text style={styles.txMetaText}> · </Text>
+          <View style={[styles.payBadge, { backgroundColor: tx.payMethod === 'cash' ? '#F0F4FF' : '#FFF0F6' }]}>
+            <Text style={[styles.payBadgeText, { color: tx.payMethod === 'cash' ? '#4A6CF7' : '#E05C9C' }]}>
+              {tx.payMethod === 'cash' ? '현금' : tx.cardName ? tx.cardName : '카드'}
+            </Text>
+          </View>
         </View>
       </View>
-      <Text style={[styles.txAmount, { color: tx.type === 'income' ? colors.primary : colors.secondary }]}>
+      <Text style={[styles.txAmount, { color: tx.type === 'income' ? colors.primary : colors.secondary }]} allowFontScaling={false}>
         {tx.type === 'income' ? '+' : '-'}₩{tx.amount.toLocaleString()}
       </Text>
     </TouchableOpacity>
@@ -110,7 +57,8 @@ function TxRow({ tx, onPress }: { tx: Transaction; onPress: () => void }) {
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const { transactions, deleteTransaction, updateTransaction } = useTransactions();
-  const { user } = useAuth();
+  const { user, partnerName } = useAuth();
+  const { myName: profileName } = useProfile();
   const [activeFilter, setActiveFilter] = useState<'전체' | '지출' | '수입'>('전체');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [editTx, setEditTx] = useState<Transaction | null>(null);
@@ -122,9 +70,10 @@ export default function HistoryScreen() {
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [sortOrder, setSortOrder] = useState<'recent' | 'high' | 'low'>('recent');
   const [personFilter, setPersonFilter] = useState<'전체' | '나' | '파트너'>('전체');
+  const [payFilter, setPayFilter] = useState<'전체' | '현금' | '카드'>('전체');
 
-  const myName = user?.name ?? '나';
-  const isFilterActive = sortOrder !== 'recent' || personFilter !== '전체';
+  const myName = profileName || user?.name || '나';
+  const isFilterActive = sortOrder !== 'recent' || personFilter !== '전체' || payFilter !== '전체';
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -141,6 +90,8 @@ export default function HistoryScreen() {
       if (activeFilter === '수입' && tx.type !== 'income') return false;
       if (personFilter === '나' && tx.person !== myName) return false;
       if (personFilter === '파트너' && tx.person === myName) return false;
+      if (payFilter === '현금' && tx.payMethod !== 'cash') return false;
+      if (payFilter === '카드' && tx.payMethod !== 'card') return false;
       return true;
     });
   }, [transactions, monthStr, activeFilter, personFilter, myName]);
@@ -171,11 +122,11 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} translucent={false} />
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>거래 내역</Text>
+        <Text style={styles.headerTitle} allowFontScaling={false}>거래 내역</Text>
         <TouchableOpacity
           style={[styles.iconBtn, isFilterActive && styles.iconBtnActive]}
           onPress={() => setShowFilterSheet(true)}
@@ -240,7 +191,12 @@ export default function HistoryScreen() {
       </View>
 
       {/* Transaction list */}
-      <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.list}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+      >
         {sortedFiltered.length === 0 && (
           <View style={styles.emptyWrap}>
             <Ionicons name="receipt-outline" size={40} color={colors.border} />
@@ -256,7 +212,6 @@ export default function HistoryScreen() {
           ))
           : sortedFiltered.map((tx) => <TxRow key={tx.id} tx={tx} onPress={() => setSelectedTx(tx)} />)
         }
-        <View style={{ height: 24 }} />
       </ScrollView>
 
       {/* Transaction Detail Bottom Sheet */}
@@ -278,9 +233,14 @@ export default function HistoryScreen() {
               <View style={[styles.personBadge, { backgroundColor: colors.primaryLighter }]}>
                 <Text style={[styles.personBadgeText, { color: colors.primary }]}>{selectedTx.person}</Text>
               </View>
+              <View style={[styles.payBadge, { backgroundColor: selectedTx.payMethod === 'cash' ? '#F0F4FF' : '#FFF0F6' }]}>
+                <Text style={[styles.payBadgeText, { color: selectedTx.payMethod === 'cash' ? '#4A6CF7' : '#E05C9C' }]}>
+                  {selectedTx.payMethod === 'cash' ? '현금' : selectedTx.cardName ? selectedTx.cardName : '카드'}
+                </Text>
+              </View>
               <Text style={styles.sheetDate}>{getDateLabel(selectedTx.date)}</Text>
             </View>
-            <Text style={[styles.sheetAmt, { color: selectedTx.type === 'income' ? colors.primary : colors.text }]}>
+            <Text style={[styles.sheetAmt, { color: selectedTx.type === 'income' ? colors.primary : colors.text }]} allowFontScaling={false}>
               {selectedTx.type === 'income' ? '+' : '-'}₩{selectedTx.amount.toLocaleString()}
             </Text>
             <View style={styles.timeRow}>
@@ -319,7 +279,7 @@ export default function HistoryScreen() {
               </>
             )}
             <View style={styles.sheetDivider} />
-            {selectedTx.person === (user?.name ?? '나') ? (
+            {selectedTx.person === myName ? (
               <View style={styles.actionRow}>
                 <TouchableOpacity
                   style={styles.editBtn}
@@ -363,7 +323,7 @@ export default function HistoryScreen() {
           <View style={styles.filterSheetHeader}>
             <Text style={styles.filterSheetTitle}>필터</Text>
             <TouchableOpacity
-              onPress={() => { setSortOrder('recent'); setPersonFilter('전체'); }}
+              onPress={() => { setSortOrder('recent'); setPersonFilter('전체'); setPayFilter('전체'); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={styles.filterResetText}>초기화</Text>
@@ -397,7 +357,21 @@ export default function HistoryScreen() {
                 onPress={() => setPersonFilter(p)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.filterChipText, personFilter === p && styles.filterChipTextActive]}>{p}</Text>
+                <Text style={[styles.filterChipText, personFilter === p && styles.filterChipTextActive]}>{p === '나' ? myName : p === '파트너' ? (partnerName || '파트너') : p}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.filterSectionLabel}>결제수단</Text>
+          <View style={styles.filterChipRow}>
+            {(['전체', '현금', '카드'] as const).map((p) => (
+              <TouchableOpacity
+                key={p}
+                style={[styles.filterChip, payFilter === p && styles.filterChipActive]}
+                onPress={() => setPayFilter(p)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.filterChipText, payFilter === p && styles.filterChipTextActive]}>{p}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -483,40 +457,42 @@ export default function HistoryScreen() {
 
       {/* Date Picker Bottom Sheet */}
       <Modal visible={showDatePicker} animationType="slide" transparent onRequestClose={() => setShowDatePicker(false)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
-        <View style={styles.ymSheet}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.ymHeader}>
-            <Text style={styles.ymTitle}>날짜 선택</Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-              <Ionicons name="close" size={18} color={colors.text} />
+        <View style={styles.ymModalWrap}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowDatePicker(false)} />
+          <View style={[styles.ymSheet, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.ymHeader}>
+              <Text style={styles.ymTitle}>날짜 선택</Text>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Ionicons name="close" size={18} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.ymDivider} />
+            <View style={styles.ymPickerRow}>
+              <WheelPicker
+                items={YEARS}
+                selectedIndex={pickYearIdx}
+                onSelect={setPickYearIdx}
+              />
+              <WheelPicker
+                items={MONTHS}
+                selectedIndex={pickMonthIdx}
+                onSelect={setPickMonthIdx}
+                format={(v) => `${v}월`}
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.ymConfirmBtn}
+              onPress={() => {
+                setYear(YEARS[pickYearIdx]);
+                setMonth(MONTHS[pickMonthIdx]);
+                setShowDatePicker(false);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.ymConfirmText}>확인</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.ymDivider} />
-          <View style={styles.ymPickerRow}>
-            <WheelPicker
-              items={YEARS}
-              selectedIndex={pickYearIdx}
-              onSelect={setPickYearIdx}
-            />
-            <WheelPicker
-              items={MONTHS}
-              selectedIndex={pickMonthIdx}
-              onSelect={setPickMonthIdx}
-              format={(v) => `${v}월`}
-            />
-          </View>
-          <TouchableOpacity
-            style={styles.ymConfirmBtn}
-            onPress={() => {
-              setYear(YEARS[pickYearIdx]);
-              setMonth(MONTHS[pickMonthIdx]);
-              setShowDatePicker(false);
-            }}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.ymConfirmText}>확인</Text>
-          </TouchableOpacity>
         </View>
       </Modal>
     </SafeAreaView>
@@ -527,7 +503,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
 
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  headerTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.text },
+  headerTitle: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 30, color: colors.text },
   iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   iconBtnActive: { backgroundColor: colors.primary },
   filterBadge: { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF6B6B' },
@@ -547,7 +523,7 @@ const styles = StyleSheet.create({
   summaryItem: { flex: 1, alignItems: 'center', gap: 4 },
   summaryLbl: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
   summaryVal: { fontFamily: fonts.semiBold, fontSize: 13 },
-  summaryDivider: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
+  summaryDivider: { width: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 4 },
 
   list: { flex: 1, paddingHorizontal: 20 },
   emptyWrap: { alignItems: 'center', gap: 12, paddingTop: 60 },
@@ -561,6 +537,8 @@ const styles = StyleSheet.create({
   txMetaText: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   txMetaName: { fontFamily: fonts.bold, fontSize: 12 },
   txAmount: { fontFamily: fonts.bold, fontSize: 15 },
+  payBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  payBadgeText: { fontFamily: fonts.semiBold, fontSize: 10 },
 
   // --- Detail sheet ---
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
@@ -579,13 +557,13 @@ const styles = StyleSheet.create({
   personBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
   personBadgeText: { fontFamily: fonts.semiBold, fontSize: 11 },
   sheetDate: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
-  sheetAmt: { fontFamily: fonts.bold, fontSize: 34, marginBottom: 14 },
+  sheetAmt: { fontFamily: fonts.bold, fontSize: 34, lineHeight: 42, marginBottom: 14 },
   timeRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   timeChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, backgroundColor: colors.canvas },
   timeChipActive: { backgroundColor: colors.primary },
   timeChipText: { fontFamily: fonts.medium, fontSize: 13, color: colors.text },
   timeChipTextActive: { color: '#FFFFFF' },
-  sheetDivider: { height: 1, backgroundColor: colors.border, marginBottom: 14 },
+  sheetDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginBottom: 14 },
   memoSec: { gap: 4, marginBottom: 14 },
   memoLbl: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   memoTxt: { fontFamily: fonts.regular, fontSize: 15, color: colors.text },
@@ -606,7 +584,8 @@ const styles = StyleSheet.create({
   viewOnlyText: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted },
 
   // --- Date picker bottom sheet ---
-  ymSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32 },
+  ymModalWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.3)' },
+  ymSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   ymHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, paddingHorizontal: 20 },
   ymTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
   ymDivider: { height: 1, backgroundColor: colors.border },
@@ -639,8 +618,5 @@ const styles = StyleSheet.create({
   editSaveBtnText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
 
   // --- Wheel picker ---
-  wheelOuter: { flex: 1, overflow: 'hidden' },
-  wheelItem: { height: ITEM_H, alignItems: 'center', justifyContent: 'center', marginHorizontal: 8 },
-  wheelItemSelected: { backgroundColor: colors.primary, borderRadius: 12 },
-  wheelText: { color: colors.text },
+  // WheelPicker styles are in ../components/WheelPicker.tsx
 });

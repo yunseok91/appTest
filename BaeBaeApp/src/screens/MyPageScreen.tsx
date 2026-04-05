@@ -48,9 +48,11 @@ function buildCSV(transactions: import('../context/TransactionContext').Transact
 
 export default function MyPageScreen() {
   const insets = useSafeAreaInsets();
+  // Android 하단 네비게이션바 높이 (edge-to-edge에서 insets.bottom이 0으로 오는 경우 대비)
+  const sheetBottom = Platform.OS === 'android' ? Math.max(insets.bottom, 24) + 24 : Math.max(insets.bottom, 16) + 20;
   const navigation = useNavigation<Nav>();
   const { budget, setBudget, cards, addCard, deleteCard, myName, myGender } = useProfile();
-  const { signOut, deleteAccount, disconnectPartner, householdId, partnerName, partnerGender } = useAuth();
+  const { signOut, deleteAccount, disconnectPartner, householdId, partnerName, partnerGender, partnerSince } = useAuth();
   const { transactions } = useTransactions();
   const now = new Date();
   const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -177,7 +179,20 @@ export default function MyPageScreen() {
             )}
           </View>
           <Text style={styles.coupleName} allowFontScaling={false}>{myName || '나'} & {partnerName || '파트너'}</Text>
-          <Text style={styles.coupleSub}>{partnerName ? `${partnerName}님과 함께 기록 중이에요 💑` : '파트너와 연결하면 함께 관리해요 ✨'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons
+              name={partnerName ? 'heart' : 'heart-outline'}
+              size={13}
+              color={partnerName ? colors.secondary : colors.textMuted}
+            />
+            <Text style={styles.coupleSub}>
+              {partnerName
+                ? (partnerSince
+                  ? (() => { const d = new Date(partnerSince); return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일부터 함께`; })()
+                  : `${partnerName}님과 함께 기록 중이에요`)
+                : '파트너와 연결하면 함께 관리해요'}
+            </Text>
+          </View>
         </View>
 
         {/* Budget card */}
@@ -237,7 +252,7 @@ export default function MyPageScreen() {
           <SectionHeader title="파트너 & 가계" />
           <MenuItem icon="pencil-outline" label="가계명 변경" onPress={() => navigation.navigate('RenameHousehold')} />
           <View style={styles.divider} />
-          {householdId ? (
+          {householdId && partnerName ? (
             <MenuItem icon="person-remove-outline" label="파트너 연결 끊기" onPress={() => setShowDisconnect(true)} color="#C47B6A" />
           ) : (
             <MenuItem icon="person-add-outline" label="파트너 초대" onPress={() => navigation.getParent()?.navigate('PartnerInvite')} />
@@ -321,7 +336,7 @@ export default function MyPageScreen() {
       <Modal visible={showCardAdd} animationType="slide" transparent onRequestClose={() => setShowCardAdd(false)}>
         <KeyboardAvoidingView style={styles.sheetKav} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowCardAdd(false)} />
-          <View style={styles.cardSheet}>
+          <View style={[styles.cardSheet, { paddingBottom: sheetBottom }]}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>카드 추가</Text>
             <View style={styles.cardInputRow}>
@@ -353,7 +368,7 @@ export default function MyPageScreen() {
       <Modal visible={showBudgetEdit} animationType="slide" transparent onRequestClose={() => setShowBudgetEdit(false)}>
         <KeyboardAvoidingView style={styles.sheetKav} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowBudgetEdit(false)} />
-          <View style={styles.cardSheet}>
+          <View style={[styles.cardSheet, { paddingBottom: sheetBottom }]}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>예산 수정</Text>
             <View style={styles.cardInputRow}>
@@ -540,7 +555,7 @@ const styles = StyleSheet.create({
   sheetKav: { flex: 1, justifyContent: 'flex-end' },
   cardSheet: {
     backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: 20, paddingBottom: 36, gap: 16,
+    padding: 20, gap: 16,
   },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 4 },
   sheetTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },

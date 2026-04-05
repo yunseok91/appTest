@@ -32,11 +32,11 @@ export default function InviteCodeScreen() {
   const { myGender } = useProfile();
   const [myCode, setMyCode] = useState('');
   const [inputCode, setInputCode] = useState('');
-  const [alertType, setAlertType] = useState<null | 'success' | 'fail'>(null);
+  const [alertType, setAlertType] = useState<null | 'fail'>(null);
   const [failReason, setFailReason] = useState('');
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [remainingSeconds, setRemainingSeconds] = useState(600); // 10분
+  const [remainingSeconds, setRemainingSeconds] = useState(86400); // 24시간
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTimer = useCallback((seconds: number) => {
@@ -55,7 +55,10 @@ export default function InviteCodeScreen() {
 
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
-  const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  const formatTime = (s: number) => {
+    if (s >= 3600) return `${Math.floor(s / 3600)}시간 ${Math.floor((s % 3600) / 60)}분`;
+    return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  };
 
   // B가 앱을 켜기 전에 A가 이미 연결한 경우 → 마운트 시 householdId가 이미 있으면 자동 이동
   // (라이브 연결은 AppNavigator 모달이 담당)
@@ -89,7 +92,7 @@ export default function InviteCodeScreen() {
         await AsyncStorage.setItem(INVITE_CODE_KEY, code);
       }
       setMyCode(code);
-      startTimer(600);
+      startTimer(86400);
       // Firestore user doc에 초대코드 저장
       if (user) {
         try { await syncUser(user.id, code); } catch {}
@@ -101,7 +104,7 @@ export default function InviteCodeScreen() {
     const code = generateCode();
     await AsyncStorage.setItem(INVITE_CODE_KEY, code);
     setMyCode(code);
-    startTimer(600);
+    startTimer(86400);
     if (user) {
       try { await syncUser(user.id, code); } catch {}
     }
@@ -134,9 +137,9 @@ export default function InviteCodeScreen() {
       ]);
       if (hId) {
         setHouseholdId(hId);
-        setAlertType('success');
+        // AppNavigator의 partnerConnectedAlert가 성공 팝업 담당
       } else {
-        setFailReason('코드를 찾을 수 없어요.\n파트너가 앱을 열어 코드를 확인했는지 확인해주세요.');
+        setFailReason('코드를 찾을 수 없어요.\n다시 확인해주세요.');
         setAlertType('fail');
       }
     } catch (e: any) {
@@ -236,26 +239,6 @@ export default function InviteCodeScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* 연결 성공 Alert */}
-      <Modal visible={alertType === 'success'} transparent animationType="fade">
-        <View style={styles.dim}>
-          <View style={styles.alertCard}>
-            <View style={[styles.alertIcon, { backgroundColor: colors.successLight }]}>
-              <Ionicons name="checkmark-circle-outline" size={32} color={colors.success} />
-            </View>
-            <Text style={styles.alertTitle}>연결 되었습니다! 🎉</Text>
-            <Text style={styles.alertSub}>파트너와 성공적으로 연결됐어요.</Text>
-            <TouchableOpacity
-              style={styles.alertBtn}
-              onPress={() => { setAlertType(null); if (isOnboarded) { navigation.goBack(); } else { navigation.navigate('HouseholdName', { isConnected: true, gender: myGender }); } }}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.alertBtnText}>다음</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* 연결 실패 Alert */}
       <Modal visible={alertType === 'fail'} transparent animationType="fade">

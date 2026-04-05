@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../context/ProfileContext';
 import PhotoViewerModal from '../components/PhotoViewerModal';
 import WheelPicker, { YEARS, MONTHS, ITEM_H } from '../components/WheelPicker';
+import TxCommentSection from '../components/TxCommentSection';
 
 type TimeSlot = '아침' | '점심' | '저녁';
 const TIME_SLOTS: TimeSlot[] = ['아침', '점심', '저녁'];
@@ -29,9 +30,10 @@ function formatW(amount: number) {
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
   const { transactions, deleteTransaction, updateTransaction } = useTransactions();
-  const { user, partnerName } = useAuth();
+  const { user, partnerName, householdId, partnerId } = useAuth();
   const { myName: profileName } = useProfile();
   const myName = profileName || user?.name || '나';
+  const detailScrollRef = useRef<import('react-native').ScrollView>(null);
 
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -254,107 +256,128 @@ export default function CalendarScreen() {
           const personColor = isMe ? '#C4729A' : '#4A90D9';
           const personBg = isMe ? '#FDF0F6' : '#EBF0FF';
           return (
-            <View style={[styles.detailSheet, { paddingBottom: insets.bottom + 16 }]}>
-              <View style={styles.sheetHandle} />
-
-              {/* 헤더: 카테고리 칩 + 닫기 */}
-              <View style={styles.detailHeader}>
-                <View style={[styles.catChip, { backgroundColor: selectedTx.categoryBgColor }]}>
-                  <Ionicons name={selectedTx.categoryIcon as any} size={14} color={selectedTx.categoryIconColor} />
-                  <Text style={[styles.catChipText, { color: selectedTx.categoryIconColor }]}>{selectedTx.category}</Text>
-                </View>
-                <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedTx(null)}>
-                  <Ionicons name="close" size={16} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              {/* 금액 */}
-              <View style={styles.detailAmtSec}>
-                <View style={styles.detailTypeRow}>
-                  <View style={styles.expenseTag}>
-                    <Text style={styles.expenseTagText}>지출</Text>
-                  </View>
-                </View>
-                <Text style={styles.detailAmt} allowFontScaling={false}>₩{selectedTx.amount.toLocaleString()}</Text>
-              </View>
-
-              <View style={styles.detailDivider} />
-
-              {/* 메모 */}
-              <View style={styles.detailMemoRow}>
-                <Ionicons name="chatbubble-outline" size={14} color={colors.inactive} />
-                <Text style={styles.detailMemoText}>{selectedTx.memo || '메모 없음'}</Text>
-              </View>
-
-              {selectedTx.photoUri && (
-                <>
-                  <View style={styles.detailDivider} />
-                  <TouchableOpacity
-                    onPress={() => {
-                      const uri = selectedTx.photoUri!;
-                      setSelectedTx(null);
-                      setViewPhotoUri(uri);
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Image source={{ uri: selectedTx.photoUri }} style={styles.detailPhoto} resizeMode="cover" />
-                    <View style={styles.photoExpandBtn}>
-                      <Ionicons name="expand-outline" size={16} color="#fff" />
+            <KeyboardAvoidingView
+              style={styles.detailSheetKav}
+              behavior="padding"
+            >
+              <View style={styles.detailSheet}>
+                <View style={styles.sheetHandle} />
+                <ScrollView
+                  ref={detailScrollRef}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+                >
+                  {/* 헤더: 카테고리 칩 + 닫기 */}
+                  <View style={styles.detailHeader}>
+                    <View style={[styles.catChip, { backgroundColor: selectedTx.categoryBgColor }]}>
+                      <Ionicons name={selectedTx.categoryIcon as any} size={14} color={selectedTx.categoryIconColor} />
+                      <Text style={[styles.catChipText, { color: selectedTx.categoryIconColor }]}>{selectedTx.category}</Text>
                     </View>
-                  </TouchableOpacity>
-                </>
-              )}
+                    <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedTx(null)}>
+                      <Ionicons name="close" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
 
-              <View style={styles.detailDivider} />
+                  {/* 금액 */}
+                  <View style={styles.detailAmtSec}>
+                    <View style={styles.detailTypeRow}>
+                      <View style={styles.expenseTag}>
+                        <Text style={styles.expenseTagText}>지출</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.detailAmt} allowFontScaling={false}>₩{selectedTx.amount.toLocaleString()}</Text>
+                  </View>
 
-              {/* 기록자 */}
-              <View style={styles.detailRecorderRow}>
-                <Text style={styles.detailRecorderLabel}>기록자</Text>
-                <View style={[styles.recorderBadge, { backgroundColor: personBg }]}>
-                  <View style={[styles.dot, { backgroundColor: personColor }]} />
-                  <Text style={[styles.recorderName, { color: personColor }]}>{selectedTx.person}</Text>
-                </View>
-              </View>
+                  <View style={styles.detailDivider} />
 
-              {/* 수정/삭제 버튼 — 내 거래만 */}
-              {isMe && (
-                <View style={styles.detailActions}>
-                  <TouchableOpacity
-                    style={styles.editBtn}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      const tx = selectedTx;
-                      setSelectedTx(null);
-                      setSelectedDay(null);
-                      setEditTx(tx);
-                      setEditAmount(String(tx.amount));
-                      setEditMemo(tx.memo);
-                      setEditTime(tx.time as TimeSlot);
-                    }}
-                  >
-                    <Ionicons name="pencil-outline" size={16} color={colors.text} />
-                    <Text style={styles.editBtnText}>수정</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      Alert.alert('삭제', `"${selectedTx.memo}" 내역을 삭제할까요?`, [
-                        { text: '취소', style: 'cancel' },
-                        { text: '삭제', style: 'destructive', onPress: () => {
-                          deleteTransaction(selectedTx.id);
+                  {/* 메모 */}
+                  <View style={styles.detailMemoRow}>
+                    <Ionicons name="chatbubble-outline" size={14} color={colors.inactive} />
+                    <Text style={styles.detailMemoText}>{selectedTx.memo || '메모 없음'}</Text>
+                  </View>
+
+                  {selectedTx.photoUri && (
+                    <>
+                      <View style={styles.detailDivider} />
+                      <TouchableOpacity
+                        onPress={() => {
+                          const uri = selectedTx.photoUri!;
+                          setSelectedTx(null);
+                          setViewPhotoUri(uri);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Image source={{ uri: selectedTx.photoUri }} style={styles.detailPhoto} resizeMode="cover" />
+                        <View style={styles.photoExpandBtn}>
+                          <Ionicons name="expand-outline" size={16} color="#fff" />
+                        </View>
+                      </TouchableOpacity>
+                    </>
+                  )}
+
+                  <View style={styles.detailDivider} />
+
+                  {/* 기록자 */}
+                  <View style={styles.detailRecorderRow}>
+                    <Text style={styles.detailRecorderLabel}>기록자</Text>
+                    <View style={[styles.recorderBadge, { backgroundColor: personBg }]}>
+                      <View style={[styles.dot, { backgroundColor: personColor }]} />
+                      <Text style={[styles.recorderName, { color: personColor }]}>{selectedTx.person}</Text>
+                    </View>
+                  </View>
+
+                  {/* 수정/삭제 버튼 — 내 거래만 */}
+                  {isMe && (
+                    <View style={styles.detailActions}>
+                      <TouchableOpacity
+                        style={styles.editBtn}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          const tx = selectedTx;
                           setSelectedTx(null);
                           setSelectedDay(null);
-                        }},
-                      ]);
-                    }}
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#E05C5C" />
-                    <Text style={styles.deleteBtnText}>삭제</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+                          setEditTx(tx);
+                          setEditAmount(String(tx.amount));
+                          setEditMemo(tx.memo);
+                          setEditTime(tx.time as TimeSlot);
+                        }}
+                      >
+                        <Ionicons name="pencil-outline" size={16} color={colors.text} />
+                        <Text style={styles.editBtnText}>수정</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          Alert.alert('삭제', `"${selectedTx.memo}" 내역을 삭제할까요?`, [
+                            { text: '취소', style: 'cancel' },
+                            { text: '삭제', style: 'destructive', onPress: () => {
+                              deleteTransaction(selectedTx.id);
+                              setSelectedTx(null);
+                              setSelectedDay(null);
+                            }},
+                          ]);
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#E05C5C" />
+                        <Text style={styles.deleteBtnText}>삭제</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  <View style={styles.detailDivider} />
+                  <TxCommentSection
+                    txId={selectedTx.id}
+                    householdId={householdId}
+                    userId={user?.id ?? ''}
+                    userName={myName}
+                    partnerUserId={partnerId ?? undefined}
+                    onInputFocus={() => detailScrollRef.current?.scrollToEnd({ animated: true })}
+                  />
+                </ScrollView>
+              </View>
+            </KeyboardAvoidingView>
           );
         })()}
       </Modal>
@@ -555,7 +578,8 @@ const styles = StyleSheet.create({
   sheetTotalVal: { fontFamily: fonts.bold, fontSize: 15, color: colors.text },
 
   // 거래 상세 시트 (tcF6p)
-  detailSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 8 },
+  detailSheetKav: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  detailSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 8, maxHeight: '92%' },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 52 },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
   catChipText: { fontFamily: fonts.semiBold, fontSize: 13 },

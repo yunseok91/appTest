@@ -1,105 +1,68 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator, Alert, Platform,
+  View, Text, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { GoogleAuthProvider } from 'firebase/auth';
 import { colors, fonts } from '../theme/colors';
 import GoogleIcon from '../components/GoogleIcon';
 import BaeBaeMark from '../components/BaeBaeMark';
 import { useAuth } from '../context/AuthContext';
-import { auth } from '../config/firebase';
-
-WebBrowser.maybeCompleteAuthSession();
 
 const WEB_CLIENT_ID = '476537137658-v8a134ljp7fkkgivbpg1vk2bg58vltb0.apps.googleusercontent.com';
+const IOS_CLIENT_ID = '476537137658-iko16ukbpt14to4ot4enkeotbrlrjbtn.apps.googleusercontent.com';
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
+  const { signIn, devSignIn } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  // iOS (Expo Go) — auth.expo.io 프록시 방식
-  const redirectUri = 'https://auth.expo.io/@leeyunseok/baebae-app';
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: WEB_CLIENT_ID,
-    webClientId: WEB_CLIENT_ID,
-    redirectUri,
-  });
+  // 네이티브 모듈 사용 가능 여부 체크
+  let hasNativeGoogleSignIn = false;
+  try {
+    require('@react-native-google-signin/google-signin');
+    hasNativeGoogleSignIn = true;
+  } catch {}
 
-  useEffect(() => {
-    if (response?.type === 'success') {
-      handleAccessToken(response.authentication?.accessToken);
-    } else if (response?.type === 'error') {
-      setLoading(false);
-      Alert.alert('로그인 실패', response.error?.message ?? '다시 시도해 주세요.');
-    } else if (response?.type === 'dismiss' || response?.type === 'cancel') {
-      setLoading(false);
+  const handleGoogleSignIn = async () => {
+    if (!hasNativeGoogleSignIn) {
+      Alert.alert('Expo Go 제한', '개발 모드 진입 버튼을 사용해주세요.\n\nGoogle 로그인은 development build가 필요합니다.');
+      return;
     }
-  }, [response]);
-
-  const handleAccessToken = async (accessToken?: string) => {
-    if (!accessToken) { setLoading(false); return; }
-    try {
-      const credential = GoogleAuthProvider.credential(null, accessToken);
-      const userCredential = await signInWithCredential(auth, credential);
-      const fbUser = userCredential.user;
-      await signIn({
-        id: fbUser.uid,
-        name: fbUser.displayName ?? '사용자',
-        email: fbUser.email ?? '',
-        picture: fbUser.photoURL ?? '',
-      });
-    } catch (e: any) {
-      console.warn('[Login] Firebase error:', e?.code, e?.message);
-      Alert.alert('로그인 실패', '다시 시도해 주세요.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleNativeAndroid = async () => {
+    setLoading(true);
     try {
       const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-      GoogleSignin.configure({ webClientId: WEB_CLIENT_ID });
-      await GoogleSignin.hasPlayServices();
+      GoogleSignin.configure({
+        webClientId: WEB_CLIENT_ID,
+        iosClientId: IOS_CLIENT_ID,
+      });
       try { await GoogleSignin.signOut(); } catch {}
       const userInfo = await GoogleSignin.signIn();
       const idToken = userInfo.idToken ?? userInfo.data?.idToken;
       if (!idToken) throw new Error('idToken not found');
       const credential = GoogleAuthProvider.credential(idToken);
-      const userCredential = await signInWithCredential(auth, credential);
-      const fbUser = userCredential.user;
-      await signIn({
-        id: fbUser.uid,
-        name: fbUser.displayName ?? '사용자',
-        email: fbUser.email ?? '',
-        picture: fbUser.photoURL ?? '',
-      });
+      await signIn(credential);
     } catch (e: any) {
       try {
         const { statusCodes } = require('@react-native-google-signin/google-signin');
         if (e.code === statusCodes.SIGN_IN_CANCELLED) return;
       } catch {}
-      console.warn('[Login] Android error:', e?.code, e?.message);
+      console.warn('[Login] error:', e?.code, e?.message);
       Alert.alert('로그인 실패', '다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePress = async () => {
-    setLoading(true);
-    if (Platform.OS === 'android') {
-      await handleNativeAndroid();
-    } else {
-      await promptAsync();
-    }
-  };
-
   const handleDevBypass = async () => {
-    await signIn({ id: 'dev-001', name: '개발자', email: 'dev@baebae.app', picture: '' });
+    setLoading(true);
+    try {
+      await devSignIn();
+    } catch (e: any) {
+      console.warn('[Login] Dev bypass error:', e?.message);
+      Alert.alert('개발 모드 실패', e?.message ?? '다시 시도해 주세요.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -119,9 +82,9 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.googleBtn, (loading || (Platform.OS !== 'android' && !request)) && styles.googleBtnDisabled]}
-            onPress={handlePress}
-            disabled={loading || (Platform.OS !== 'android' && !request)}
+            style={[styles.googleBtn, loading && styles.googleBtnDisabled]}
+            onPress={handleGoogleSignIn}
+            disabled={loading}
             activeOpacity={0.85}
           >
             {loading ? (

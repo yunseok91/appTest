@@ -99,7 +99,7 @@ function MainTabs() {
 }
 
 export default function AppNavigator() {
-  const { user, isLoading, isOnboarded, partnerName, partnerConnectedAlert, clearPartnerAlert, partnerDisconnectedAlert, clearPartnerDisconnectedAlert, forcedLogoutAlert, clearForcedLogoutAlert } = useAuth();
+  const { user, isLoading, isOnboarded, partnerName, partnerConnectedAlert, clearPartnerAlert, partnerDisconnectedAlert, clearPartnerDisconnectedAlert, partnerBudgetAlert, clearPartnerBudgetAlert, forcedLogoutAlert, clearForcedLogoutAlert } = useAuth();
   const prevIsOnboarded = useRef(isOnboarded);
 
   useEffect(() => {
@@ -154,20 +154,42 @@ export default function AppNavigator() {
         </View>
       </View>
     </Modal>
+    <Modal visible={partnerBudgetAlert} transparent animationType="fade" onRequestClose={clearPartnerBudgetAlert}>
+      <View style={styles.alertDim}>
+        <View style={styles.alertCard}>
+          <Text style={styles.alertEmoji}>💰</Text>
+          <Text style={styles.alertTitle}>예산이 설정됐어요</Text>
+          <Text style={styles.alertSub}>파트너가 이번 달 예산을 설정했습니다.</Text>
+          <TouchableOpacity style={styles.alertBtn} onPress={clearPartnerBudgetAlert} activeOpacity={0.85}>
+            <Text style={styles.alertBtnText}>확인</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
     <Modal visible={partnerConnectedAlert} transparent animationType="fade" onRequestClose={clearPartnerAlert}>
       <View style={styles.alertDim}>
         <View style={styles.alertCard}>
-          <Text style={styles.alertEmoji}>💑</Text>
-          <Text style={styles.alertTitle}>연동되었습니다!</Text>
-          <Text style={styles.alertSub}>{partnerName ? `${partnerName}님과 연결됐어요` : '파트너와 연결됐어요'}</Text>
+          <View style={styles.alertIconBg}>
+            <Ionicons name="checkmark-circle" size={32} color="#3D8A5A" />
+          </View>
+          <Text style={styles.alertTitle}>연결 되었습니다! 🎉</Text>
+          <Text style={styles.alertSub}>{partnerName ? `${partnerName}님과 성공적으로 연결됐어요.` : '파트너와 성공적으로 연결됐어요.'}</Text>
+          <Text style={styles.alertNotice}>예산 설정과 가계명이 초기화됩니다.</Text>
           <TouchableOpacity
             style={styles.alertBtn}
             onPress={() => {
               clearPartnerAlert();
-              // 온보딩 중에 연결된 경우(B유저) → 가계명 설정 화면으로 이동해 온보딩 완료
-              if (!isOnboarded && navigationRef.isReady()) {
-                navigationRef.dispatch(CommonActions.navigate('HouseholdName', { isConnected: true }));
-              }
+              // iOS Modal fade-out 애니메이션(~300ms) 후 navigate — 그 전에 dispatch하면 iOS에서 씹힘
+              setTimeout(() => {
+                if (!navigationRef.isReady()) return;
+                if (isOnboarded) {
+                  // A유저: 이미 MainTabs이지만 iOS blank 방지용 reset
+                  navigationRef.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'MainTabs' }] }));
+                } else {
+                  // B유저: 온보딩 완료를 위해 HouseholdName으로
+                  navigationRef.dispatch(CommonActions.navigate('HouseholdName', { isConnected: true }));
+                }
+              }, 350);
             }}
             activeOpacity={0.85}
           >
@@ -239,8 +261,10 @@ const styles = StyleSheet.create({
   alertDim: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center' },
   alertCard: { width: '80%', backgroundColor: colors.card, borderRadius: 20, padding: 28, alignItems: 'center', gap: 8 },
   alertEmoji: { fontSize: 48, marginBottom: 4 },
+  alertIconBg: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#E8F5EE', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   alertTitle: { fontFamily: fonts.bold, fontSize: 20, color: colors.text },
   alertSub: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
+  alertNotice: { fontFamily: fonts.regular, fontSize: 12, color: colors.error, textAlign: 'center' },
   alertBtn: { marginTop: 12, backgroundColor: colors.primary, borderRadius: 100, width: '100%', height: 48, alignItems: 'center', justifyContent: 'center' },
   alertBtnText: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.white },
 });

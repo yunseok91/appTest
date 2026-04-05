@@ -14,12 +14,15 @@ import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, type Category } from '../config/
 import { useTransactions } from '../context/TransactionContext';
 import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../context/ProfileContext';
+import {
+  subscribeNotifications, markNotificationReadFS, markAllNotificationsReadFS,
+  type AppNotification,
+} from '../services/firestoreService';
 
 type TimeSlot = 'morning' | 'lunch' | 'evening';
 type TabType = 'expense' | 'income';
 type PayMethod = 'cash' | 'card';
 
-type Notification = { id: string; message: string; time: string; read: boolean };
 
 
 
@@ -99,8 +102,14 @@ export default function HomeScreen() {
   const [showCardPicker, setShowCardPicker] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Firestore 알림 구독
+  useEffect(() => {
+    if (!user?.id) return;
+    return subscribeNotifications(user.id, setNotifications);
+  }, [user?.id]);
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [pickerDate, setPickerDate] = useState(() => { const d = new Date(); d.setDate(1); return d; });
@@ -534,7 +543,7 @@ export default function HomeScreen() {
           <View style={styles.notiiHeader}>
             <Text style={styles.notiiTitle}>알림</Text>
             {unreadCount > 0 && (
-              <TouchableOpacity onPress={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))} activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => user && markAllNotificationsReadFS(user.id).catch(() => {})} activeOpacity={0.7}>
                 <Text style={styles.notiiReadAll}>모두 읽음</Text>
               </TouchableOpacity>
             )}
@@ -550,12 +559,18 @@ export default function HomeScreen() {
                 key={n.id}
                 style={[styles.notiiItem, !n.read && styles.notiiItemUnread]}
                 activeOpacity={0.7}
-                onPress={() => setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))}
+                onPress={() => user && !n.read && markNotificationReadFS(user.id, n.id).catch(() => {})}
               >
                 <View style={[styles.notiiDot, { backgroundColor: n.read ? colors.border : colors.primary }]} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={[styles.notiiMsg, !n.read && { fontFamily: fonts.semiBold }]}>{n.message}</Text>
-                  <Text style={styles.notiiTime}>{n.time}</Text>
+                  <Text style={styles.notiiTime}>{(() => {
+                    const diff = Math.floor((Date.now() - new Date(n.createdAt).getTime()) / 1000);
+                    if (diff < 60) return '방금';
+                    if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
+                    if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
+                    return `${Math.floor(diff / 86400)}일 전`;
+                  })()}</Text>
                 </View>
               </TouchableOpacity>
             ))
@@ -731,7 +746,7 @@ const styles = StyleSheet.create({
   amountPrefix: { fontFamily: undefined, fontSize: 34, color: colors.text, marginRight: 2, letterSpacing: 0 },
   amountInput: {
     flex: 1,
-    fontFamily: fonts.bold, fontSize: 34, color: colors.text,
+    fontFamily: fonts.bold, fontSize: 34, lineHeight: 42, color: colors.text,
     letterSpacing: 0, paddingHorizontal: 0, paddingVertical: 4, textAlignVertical: 'center',
   },
 

@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { onAuthStateChanged, signOut as firebaseSignOut, deleteUser, GoogleAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut, deleteUser, signInWithCredential } from 'firebase/auth';
+import type { AuthCredential } from 'firebase/auth';
 import { onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import * as SecureStore from 'expo-secure-store';
-import { syncUser, disconnectPartner as disconnectPartnerFS, updateHouseholdName as updateHouseholdNameFS, removePartnerTransactions } from '../services/firestoreService';
+import { syncUser, disconnectPartner as disconnectPartnerFS, updateHouseholdName as updateHouseholdNameFS, updateHouseholdBudget as updateHouseholdBudgetFS, removePartnerTransactions } from '../services/firestoreService';
 
 export type GoogleUser = {
   id: string;
@@ -21,13 +22,19 @@ type AuthContextType = {
   householdId: string | null;
   partnerName: string | null;
   partnerGender: 'male' | 'female' | null;
+  partnerId: string | null;
   partnerConnectedAlert: boolean;
   clearPartnerAlert: () => void;
   partnerDisconnectedAlert: boolean;
   clearPartnerDisconnectedAlert: () => void;
+  partnerSince: string | null;
+  partnerBudgetAlert: boolean;
+  clearPartnerBudgetAlert: () => void;
+  triggerPartnerBudgetAlert: () => void;
   forcedLogoutAlert: boolean;
   clearForcedLogoutAlert: () => void;
-  signIn: (user: GoogleUser) => Promise<void>;
+  signIn: (credential: AuthCredential) => Promise<void>;
+  devSignIn: () => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   disconnectPartner: () => Promise<void>;
@@ -47,13 +54,19 @@ const AuthContext = createContext<AuthContextType>({
   householdId: null,
   partnerName: null,
   partnerGender: null,
+  partnerId: null,
+  partnerSince: null,
   partnerConnectedAlert: false,
   clearPartnerAlert: () => {},
   partnerDisconnectedAlert: false,
   clearPartnerDisconnectedAlert: () => {},
+  partnerBudgetAlert: false,
+  clearPartnerBudgetAlert: () => {},
+  triggerPartnerBudgetAlert: () => {},
   forcedLogoutAlert: false,
   clearForcedLogoutAlert: () => {},
-  signIn: async () => {},
+  signIn: async (_credential: AuthCredential) => {},
+  devSignIn: async () => {},
   signOut: async () => {},
   deleteAccount: async () => {},
   disconnectPartner: async () => {},
@@ -77,8 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [householdId, setHouseholdIdState] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState<string | null>(null);
   const [partnerGender, setPartnerGender] = useState<'male' | 'female' | null>(null);
+  const [partnerId, setPartnerId] = useState<string | null>(null);
   const [partnerConnectedAlert, setPartnerConnectedAlert] = useState(false);
   const [partnerDisconnectedAlert, setPartnerDisconnectedAlert] = useState(false);
+  const [partnerBudgetAlert, setPartnerBudgetAlert] = useState(false);
+  const [partnerSince, setPartnerSince] = useState<string | null>(null);
   const [forcedLogoutAlert, setForcedLogoutAlert] = useState(false);
   const sessionTokenRef = useRef<string | null>(null);
   const prevMemberCountRef = useRef<number>(0);
@@ -87,20 +103,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const justJoinedRef = useRef(false);
   // Keep householdId in a ref for use in async callbacks (avoids stale closure)
   const householdIdRef = useRef<string | null>(null);
+  // signIn 진행 중 플래그 — onAuthStateChanged/onSnapshot 간섭 방지
+  const signingInRef = useRef(false);
 
   useEffect(() => {
     householdIdRef.current = householdId;
   }, [householdId]);
 
+  // 앱 시작 시 GoogleSignin 미리 configure (deleteAccount 재인증 대비)
+  useEffect(() => {
+    try {
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      GoogleSignin.configure({
+        webClientId: '476537137658-v8a134ljp7fkkgivbpg1vk2bg58vltb0.apps.googleusercontent.com',
+        iosClientId: '476537137658-iko16ukbpt14to4ot4enkeotbrlrjbtn.apps.googleusercontent.com',
+      });
+    } catch {}
+  }, []);
+
   useEffect(() => {
     // Firebase Auth 세션 복원 (앱 재시작 시 자동 로그인)
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      const [houseVal, onboardedVal, hIdVal, lastUid] = await Promise.all([
+      // signIn()이 진행 중이면 → signIn이 모든 상태를 직접 관리하므로 여기서는 스킵
+      // (signInWithCredential이 onAuthStateChanged를 트리거하지만, signIn이 이미 처리함)
+      if (signingInRef.current) {
+        return;
+      }
+
+      const [houseVal, onboardedVal, hIdVal, lastUid, partnerSinceVal] = await Promise.all([
         AsyncStorage.getItem(HOUSEHOLD_KEY),
         AsyncStorage.getItem(ONBOARDED_KEY),
         AsyncStorage.getItem(HOUSEHOLD_ID_KEY),
         AsyncStorage.getItem(LAST_UID_KEY),
+        AsyncStorage.getItem('@baebae_partner_since'),
       ]);
+      if (partnerSinceVal) setPartnerSince(partnerSinceVal);
 
       if (firebaseUser) {
         // 세션 토큰 복원
@@ -117,14 +154,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             '@baebae_transactions', '@baebae_migrated',
             '@profile_budget', '@profile_cards', '@profile_myname', '@profile_gender',
           ]);
+          setIsOnboarded(false);
+          setHouseholdIdState(null);
+          householdIdRef.current = null;
         } else {
           // 같은 계정: 로컬 데이터 복원. ONBOARDED_KEY 없으면 Firestore fallback
           if (houseVal) setHouseholdNameState(houseVal);
-          if (hIdVal) setHouseholdIdState(hIdVal);
+          if (hIdVal) {
+            setHouseholdIdState(hIdVal);
+            householdIdRef.current = hIdVal;
+          }
           if (onboardedVal === 'true') {
             setIsOnboarded(true);
           } else {
-            // 이전 버전에서 로그아웃 시 ONBOARDED_KEY를 지운 경우 → Firestore에서 복원
+            // Firestore에서 복원
             try {
               const { name: fsName, gender: fsGender, householdId: fsHId } = await syncUser(firebaseUser.uid, '');
               if (fsName) {
@@ -136,7 +179,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (fsHId && !hIdVal) restoreItems.push([HOUSEHOLD_ID_KEY, fsHId]);
                 await AsyncStorage.multiSet(restoreItems);
                 setIsOnboarded(true);
-                if (fsHId && !hIdVal) setHouseholdIdState(fsHId);
+                if (fsHId && !hIdVal) {
+                  setHouseholdIdState(fsHId);
+                  householdIdRef.current = fsHId;
+                }
               }
             } catch {}
           }
@@ -148,12 +194,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           picture: firebaseUser.photoURL ?? '',
         });
       } else {
-        if (houseVal) setHouseholdNameState(houseVal);
-        if (onboardedVal === 'true') setIsOnboarded(true);
-        if (hIdVal) setHouseholdIdState(hIdVal);
+        // Firebase 세션 없음 (signOut 후 또는 앱 최초 실행)
         const userVal = await AsyncStorage.getItem(STORAGE_KEY);
-        if (userVal) setUser(JSON.parse(userVal));
-        else setUser(null);
+        if (userVal) {
+          // 로컬에 유저 데이터가 있으면 복원 (앱 재시작)
+          if (houseVal) setHouseholdNameState(houseVal);
+          if (onboardedVal === 'true') setIsOnboarded(true);
+          if (hIdVal) setHouseholdIdState(hIdVal);
+          setUser(JSON.parse(userVal));
+        } else {
+          setUser(null);
+        }
       }
       setIsLoading(false);
     });
@@ -172,8 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const fsHouseholdId: string | null = data.householdId ?? null;
 
       // 다중 기기 로그인 감지: Firestore 토큰 ≠ 로컬 토큰 → 강제 로그아웃
+      // signIn 진행 중에는 토큰이 업데이트되는 과정이므로 체크 스킵
       const fsSessionToken: string | undefined = data.sessionToken;
-      if (fsSessionToken && sessionTokenRef.current && fsSessionToken !== sessionTokenRef.current) {
+      if (!signingInRef.current && fsSessionToken && sessionTokenRef.current && fsSessionToken !== sessionTokenRef.current) {
         setForcedLogoutAlert(true);
         sessionTokenRef.current = null;
         signOut();
@@ -221,13 +273,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const memberIds: string[] = data.memberIds ?? [];
       const partnerIds = memberIds.filter(id => id !== user.id);
 
-      // Firestore 가계명 → 로컬 동기화
+      // 가계명 양방향 동기화
       if (data.name && data.name !== householdName) {
-        setHouseholdNameState(data.name);
-        AsyncStorage.setItem(HOUSEHOLD_KEY, data.name);
+        if (isFirstSnapshot && data.name === DEFAULT_HOUSEHOLD && householdName !== DEFAULT_HOUSEHOLD) {
+          // 첫 스냅샷: Firestore가 기본명이고 로컬이 커스텀명 → 로컬 이름을 Firestore에 푸시
+          updateDoc(snap.ref, { name: householdName }).catch(() => {});
+        } else {
+          // 그 외: Firestore → 로컬 동기화
+          setHouseholdNameState(data.name);
+          AsyncStorage.setItem(HOUSEHOLD_KEY, data.name);
+        }
+      }
+
+      // 진짜 신규 연결 여부:
+      //   - 첫 스냅샷: justJoinedRef가 true일 때만 (앱 재시작 시 prevMemberCount=0이어도 false)
+      //   - 이후 스냅샷: 멤버 수가 늘어난 경우
+      const isNewConnection = isFirstSnapshot
+        ? justJoinedRef.current
+        : memberIds.length > prevMemberCountRef.current;
+
+      // 파트너 연결 시 예산 초기화 (A·B 양쪽 모두) — 실제 신규 연결 시에만
+      if (isNewConnection && memberIds.length > 1) {
+        AsyncStorage.setItem('@profile_budget', '0');
+        updateHouseholdBudgetFS(householdId, 0).catch(() => {});
       }
 
       if (partnerIds.length > 0) {
+        setPartnerId(partnerIds[0]);
         // 파트너 이름 & 성별 로드
         try {
           const partnerDoc = await getDoc(doc(db, 'users', partnerIds[0]));
@@ -238,27 +310,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch {}
 
-        // 알럿 조건:
-        //   - 첫 스냅샷 + justJoined → Person B가 막 연결됨
-        //   - 이후 스냅샷에서 멤버 수 증가 → Person A가 파트너 합류 감지
-        const shouldAlert = isFirstSnapshot
-          ? justJoinedRef.current
-          : memberIds.length > prevMemberCountRef.current;
+        // 알럿 조건: 실제 신규 연결 시에만 (앱 재시작 시 중복 팝업 방지)
+        const shouldAlert = isNewConnection;
 
         if (shouldAlert) {
           setPartnerConnectedAlert(true);
           justJoinedRef.current = false;
+          // 연결 날짜 저장 (아직 없을 때만 — 재연결 시 덮어쓰기)
+          AsyncStorage.getItem('@baebae_partner_since').then(existing => {
+            if (!existing) {
+              const now = new Date().toISOString();
+              AsyncStorage.setItem('@baebae_partner_since', now).catch(() => {});
+              setPartnerSince(now);
+            }
+          });
         }
       } else {
         setPartnerName(null);
         setPartnerGender(null);
+        setPartnerId(null);
         // 첫 스냅샷이 아닌데 파트너가 없어진 경우 → 파트너가 나간 것
         if (!isFirstSnapshot && prevMemberCountRef.current > 1) {
           setPartnerDisconnectedAlert(true);
-          // 내 householdId도 로컬/Firestore에서 초기화
+          // 내 householdId·가계명 로컬/Firestore에서 초기화
           setHouseholdIdState(null);
+          setHouseholdNameState(DEFAULT_HOUSEHOLD);
+          setPartnerSince(null);
           householdIdRef.current = null;
-          AsyncStorage.removeItem(HOUSEHOLD_ID_KEY).catch(() => {});
+          AsyncStorage.multiRemove([HOUSEHOLD_ID_KEY, HOUSEHOLD_KEY, '@baebae_partner_since']).catch(() => {});
           if (user) {
             updateDoc(doc(db, 'users', user.id), { householdId: null }).catch(() => {});
           }
@@ -272,49 +351,146 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [householdId, user?.id]);
 
-  const signIn = async (googleUser: GoogleUser) => {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(googleUser));
-    setUser(googleUser);
-
-    // 세션 토큰 생성 및 저장 (다중 기기 로그인 감지용)
-    const token = Date.now().toString(36) + Math.random().toString(36).substring(2);
-    sessionTokenRef.current = token;
-    try { await SecureStore.setItemAsync('baebae_session_token', token); } catch {}
+  const signIn = async (credential: AuthCredential) => {
+    // ★ signInWithCredential보다 먼저 플래그 설정 → onAuthStateChanged 간섭 완전 차단
+    signingInRef.current = true;
 
     try {
-      const localInviteCode = await AsyncStorage.getItem('@baebae_invite_code') ?? '';
-      const { householdId: fsHouseholdId, inviteCode: fsInviteCode, name: fsName, gender: fsGender } = await syncUser(googleUser.id, localInviteCode, { sessionToken: token });
-      if (fsHouseholdId && !householdIdRef.current) {
-        setHouseholdIdState(fsHouseholdId);
-        await AsyncStorage.setItem(HOUSEHOLD_ID_KEY, fsHouseholdId);
-      }
-      if (fsInviteCode && !localInviteCode) {
-        await AsyncStorage.setItem('@baebae_invite_code', fsInviteCode);
-      }
-      // Firestore에 프로필이 있는데 로컬 onboarded 상태가 없는 경우 복원
-      // (이전 버전에서 로그아웃 시 ONBOARDED_KEY를 지운 경우 대응)
-      const localOnboarded = await AsyncStorage.getItem(ONBOARDED_KEY);
-      if (!localOnboarded && fsName) {
-        await AsyncStorage.multiSet([
-          [ONBOARDED_KEY, 'true'],
-          ['@profile_myname', fsName],
-          ['@profile_gender', fsGender],
+      // 1) Firebase 인증
+      const userCredential = await signInWithCredential(auth, credential);
+      const fbUser = userCredential.user;
+      const googleUser: GoogleUser = {
+        id: fbUser.uid,
+        name: fbUser.displayName ?? '사용자',
+        email: fbUser.email ?? '',
+        picture: fbUser.photoURL ?? '',
+      };
+
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(googleUser));
+
+      // 2) 다른 계정 체크
+      const lastUid = await AsyncStorage.getItem(LAST_UID_KEY);
+      if (lastUid && lastUid !== fbUser.uid) {
+        await AsyncStorage.multiRemove([
+          ONBOARDED_KEY, HOUSEHOLD_ID_KEY, HOUSEHOLD_KEY,
+          '@baebae_invite_code', '@baebae_welcome_shown',
+          '@baebae_transactions', '@baebae_migrated',
+          '@profile_budget', '@profile_cards', '@profile_myname', '@profile_gender',
         ]);
-        setIsOnboarded(true);
       }
+      // 항상 LAST_UID 갱신 (signOut 실패 시에도 안전)
+      await AsyncStorage.setItem(LAST_UID_KEY, fbUser.uid);
+
+      // 3) 세션 토큰
+      const token = Date.now().toString(36) + Math.random().toString(36).substring(2);
+      sessionTokenRef.current = token;
+      try { await SecureStore.setItemAsync('baebae_session_token', token); } catch {}
+
+      // 4) 로컬 데이터 복원
+      const [localOnboarded, localHId, localInviteCode, localHouseName] = await Promise.all([
+        AsyncStorage.getItem(ONBOARDED_KEY),
+        AsyncStorage.getItem(HOUSEHOLD_ID_KEY),
+        AsyncStorage.getItem('@baebae_invite_code'),
+        AsyncStorage.getItem(HOUSEHOLD_KEY),
+      ]);
+
+      // 중간 state 업데이트 없이 변수에 수집 → 마지막에 한번에 setState
+      let finalOnboarded = localOnboarded === 'true';
+      let finalHouseholdId = localHId;
+      let finalHouseName = localHouseName;
+
+      // 5) Firestore 동기화
+      try {
+        const { householdId: fsHouseholdId, inviteCode: fsInviteCode, name: fsName, gender: fsGender } = await syncUser(fbUser.uid, localInviteCode ?? '', { sessionToken: token });
+
+        if (fsHouseholdId && !finalHouseholdId) {
+          finalHouseholdId = fsHouseholdId;
+          await AsyncStorage.setItem(HOUSEHOLD_ID_KEY, fsHouseholdId);
+        }
+        if (fsInviteCode && !localInviteCode) {
+          await AsyncStorage.setItem('@baebae_invite_code', fsInviteCode);
+        }
+        if (fsName) {
+          finalOnboarded = true;
+          if (localOnboarded !== 'true') {
+            await AsyncStorage.multiSet([
+              [ONBOARDED_KEY, 'true'],
+              ['@profile_myname', fsName],
+              ['@profile_gender', fsGender],
+            ]);
+          }
+        }
+      } catch (e) {
+        console.warn('[signIn] Firestore sync 실패:', e);
+      }
+
+      // ★ 모든 state를 동일 동기 블록에서 한번에 설정 → React 배치 렌더 보장
+      // (isOnboarded와 user가 서로 다른 렌더 사이클에 설정되는 레이스 컨디션 방지)
+      if (finalOnboarded) setIsOnboarded(true);
+      if (finalHouseholdId) {
+        householdIdRef.current = finalHouseholdId;
+        setHouseholdIdState(finalHouseholdId);
+      }
+      if (finalHouseName) setHouseholdNameState(finalHouseName);
+      setUser(googleUser);
+      setIsLoading(false);
     } catch (e) {
-      console.warn('[Auth] Firestore sync failed, continuing offline:', e);
+      throw e;
+    } finally {
+      signingInRef.current = false;
     }
   };
 
+  /** 개발 모드 전용 — Firebase 인증 없이 더미 유저로 진입 (Expo Go용) */
+  const devSignIn = async () => {
+    const [onboardedVal, existingUser, hIdVal, houseVal] = await Promise.all([
+      AsyncStorage.getItem(ONBOARDED_KEY),
+      AsyncStorage.getItem(STORAGE_KEY),
+      AsyncStorage.getItem(HOUSEHOLD_ID_KEY),
+      AsyncStorage.getItem(HOUSEHOLD_KEY),
+    ]);
+
+    const isOnboardedAlready = onboardedVal === 'true';
+
+    if (isOnboardedAlready && existingUser) {
+      // 기존 세션 유지 (로그아웃 후 재진입)
+      const parsed: GoogleUser = JSON.parse(existingUser);
+      if (houseVal) setHouseholdNameState(houseVal);
+      if (hIdVal) { setHouseholdIdState(hIdVal); householdIdRef.current = hIdVal; }
+      setIsOnboarded(true);
+      setUser(parsed);
+    } else {
+      // 탈퇴 후 재진입 → 완전 초기화 + 신규가입 절차
+      const devId = 'dev_' + Date.now().toString(36);
+      const devUser: GoogleUser = { id: devId, name: '테스트유저', email: 'dev@test.com', picture: '' };
+      await AsyncStorage.multiRemove([
+        STORAGE_KEY, ONBOARDED_KEY, HOUSEHOLD_ID_KEY, HOUSEHOLD_KEY,
+        '@baebae_invite_code', '@baebae_welcome_shown',
+        '@baebae_transactions', '@baebae_migrated', '@baebae_migrated_hid',
+        '@profile_budget', '@profile_cards', '@profile_myname', '@profile_gender',
+      ]);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(devUser));
+      await AsyncStorage.setItem(LAST_UID_KEY, devId);
+      setIsOnboarded(false);
+      setHouseholdIdState(null);
+      householdIdRef.current = null;
+      setHouseholdNameState(DEFAULT_HOUSEHOLD);
+      setPartnerName(null);
+      setPartnerGender(null);
+      setUser(devUser);
+    }
+    setIsLoading(false);
+  };
+
   const deleteAccount = async () => {
-    // 1) Firestore 정리 먼저 (user/householdId 참조 필요)
+    const firebaseUser = auth.currentUser;
     const uid = user?.id;
     const hId = householdId;
+
+    // 1) Firestore 데이터 정리
     if (uid && hId) {
       try { await disconnectPartnerFS(uid, hId); } catch {}
     }
-    // Firestore users doc 삭제
     if (uid) {
       try {
         const { deleteDoc } = require('firebase/firestore');
@@ -322,36 +498,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     }
 
-    // 2) Firebase Auth 계정 삭제
-    const firebaseUser = auth.currentUser;
-    if (firebaseUser) {
-      try {
-        await deleteUser(firebaseUser);
-      } catch (err: any) {
-        if (err?.code === 'auth/requires-recent-login') {
-          const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-          await GoogleSignin.hasPlayServices();
-          try { await GoogleSignin.signOut(); } catch {}
-          const userInfo = await GoogleSignin.signIn();
-          const idToken = userInfo.data?.idToken ?? userInfo.idToken;
-          const credential = GoogleAuthProvider.credential(idToken);
-          await reauthenticateWithCredential(firebaseUser, credential);
-          await deleteUser(firebaseUser);
-        } else {
-          throw err;
-        }
-      }
-    }
-
-    // 3) 로컬 상태 마지막에 정리 (Firestore 작업 완료 후)
+    // 2) 로컬 데이터 전체 초기화
     try {
       await AsyncStorage.multiRemove([
         STORAGE_KEY, ONBOARDED_KEY, HOUSEHOLD_ID_KEY, HOUSEHOLD_KEY, LAST_UID_KEY,
         '@baebae_invite_code', '@baebae_welcome_shown',
-        '@baebae_transactions', '@baebae_migrated',
+        '@baebae_transactions', '@baebae_migrated', '@baebae_migrated_hid',
         '@profile_budget', '@profile_cards', '@profile_myname', '@profile_gender',
       ]);
     } catch {}
+
+    // 3) 앱 상태 초기화 → 로그인 화면으로 이동
     setUser(null);
     setIsOnboarded(false);
     setHouseholdIdState(null);
@@ -359,17 +516,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setHouseholdNameState(DEFAULT_HOUSEHOLD);
     setPartnerName(null);
     setPartnerGender(null);
+
+    // 4) Firebase Auth 삭제 (백그라운드, 재인증 필요 시 그냥 signOut)
+    if (firebaseUser) {
+      try {
+        await deleteUser(firebaseUser);
+      } catch {
+        // 재인증 필요하거나 실패해도 무시 — 데이터는 이미 삭제됨
+        try { await firebaseSignOut(auth); } catch {}
+      }
+    }
   };
 
   const signOut = async () => {
-    // 프로필/온보딩 데이터는 유지 (같은 계정 재로그인 시 복원용)
-    // last_uid를 저장해 다른 계정이 로그인하면 초기화할 수 있도록
     try {
-      if (user) await AsyncStorage.setItem(LAST_UID_KEY, user.id);
+      if (user) {
+        console.warn('[signOut] LAST_UID 저장:', user.id);
+        await AsyncStorage.setItem(LAST_UID_KEY, user.id);
+      }
       await AsyncStorage.removeItem(STORAGE_KEY);
+      // ONBOARDED_KEY가 보존되는지 확인
+      const check = await AsyncStorage.getItem(ONBOARDED_KEY);
+      console.warn('[signOut] ONBOARDED_KEY 보존 확인:', check);
     } catch {}
+    // isOnboarded는 유지! user=null이면 Navigator가 Login을 보여주므로
+    // 재로그인 시 isOnboarded=true가 그대로 남아있어야 메인으로 바로 진입
     setUser(null);
-    setIsOnboarded(false);
     householdIdRef.current = null;
     setHouseholdIdState(null);
     setHouseholdNameState(DEFAULT_HOUSEHOLD);
@@ -385,14 +557,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await disconnectPartnerFS(user.id, householdId);
     householdIdRef.current = null;
     setHouseholdIdState(null);
+    setHouseholdNameState(DEFAULT_HOUSEHOLD);
     setPartnerName(null);
     setPartnerGender(null);
-    await AsyncStorage.removeItem(HOUSEHOLD_ID_KEY);
+    setPartnerId(null);
+    setPartnerSince(null);
+    await AsyncStorage.multiRemove([HOUSEHOLD_ID_KEY, HOUSEHOLD_KEY, '@baebae_partner_since']);
   };
 
   const completeOnboarding = async () => {
     await AsyncStorage.setItem(ONBOARDED_KEY, 'true');
     setIsOnboarded(true);
+    console.warn('[completeOnboarding] ONBOARDED_KEY 저장 완료');
   };
 
   const setHouseholdName = async (name: string) => {
@@ -415,6 +591,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearPartnerAlert = () => setPartnerConnectedAlert(false);
   const clearPartnerDisconnectedAlert = () => setPartnerDisconnectedAlert(false);
+  const clearPartnerBudgetAlert = () => setPartnerBudgetAlert(false);
+  const triggerPartnerBudgetAlert = () => setPartnerBudgetAlert(true);
   const clearForcedLogoutAlert = () => setForcedLogoutAlert(false);
 
   /** 온보딩 재진행 시 로컬 연동 상태 초기화 (Firestore는 initProfile에서 처리) */
@@ -433,10 +611,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, isLoading, isOnboarded, householdName, householdId,
-      partnerName, partnerGender, partnerConnectedAlert, clearPartnerAlert,
-      signIn, signOut, deleteAccount, disconnectPartner, completeOnboarding,
+      partnerName, partnerGender, partnerId, partnerSince, partnerConnectedAlert, clearPartnerAlert,
+      signIn, devSignIn, signOut, deleteAccount, disconnectPartner, completeOnboarding,
       setHouseholdName, setHouseholdId, resetForFreshOnboarding,
       partnerDisconnectedAlert, clearPartnerDisconnectedAlert,
+      partnerBudgetAlert, clearPartnerBudgetAlert, triggerPartnerBudgetAlert,
       forcedLogoutAlert, clearForcedLogoutAlert,
     }}>
       {children}

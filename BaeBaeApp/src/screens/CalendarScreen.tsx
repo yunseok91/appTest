@@ -1,8 +1,10 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
   Modal, ScrollView, Alert, TextInput, KeyboardAvoidingView, Platform, Image,
+  useWindowDimensions,
 } from 'react-native';
+const MEMO_MAX = 50;
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../theme/colors';
@@ -29,11 +31,12 @@ function formatW(amount: number) {
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetHeight = windowHeight - insets.top - 24;
   const { transactions, deleteTransaction, updateTransaction } = useTransactions();
   const { user, partnerName, householdId, partnerId } = useAuth();
   const { myName: profileName } = useProfile();
   const myName = profileName || user?.name || '나';
-  const detailScrollRef = useRef<import('react-native').ScrollView>(null);
 
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -227,7 +230,7 @@ export default function CalendarScreen() {
                     </View>
                     <View style={styles.txMeta}>
                       <Text style={styles.txCategory}>{tx.category}</Text>
-                      <Text style={styles.txMemo}>{tx.memo}</Text>
+                      <Text style={styles.txMemo} numberOfLines={1} ellipsizeMode="tail">{tx.memo}</Text>
                     </View>
                     <View style={styles.txRight}>
                       <Text style={styles.txAmount} allowFontScaling={false}>₩{tx.amount.toLocaleString()}</Text>
@@ -258,16 +261,10 @@ export default function CalendarScreen() {
           return (
             <KeyboardAvoidingView
               style={styles.detailSheetKav}
-              behavior="padding"
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
-              <View style={styles.detailSheet}>
+              <View style={[styles.detailSheet, { height: sheetHeight }]}>
                 <View style={styles.sheetHandle} />
-                <ScrollView
-                  ref={detailScrollRef}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-                >
                   {/* 헤더: 카테고리 칩 + 닫기 */}
                   <View style={styles.detailHeader}>
                     <View style={[styles.catChip, { backgroundColor: selectedTx.categoryBgColor }]}>
@@ -293,8 +290,10 @@ export default function CalendarScreen() {
 
                   {/* 메모 */}
                   <View style={styles.detailMemoRow}>
-                    <Ionicons name="chatbubble-outline" size={14} color={colors.inactive} />
-                    <Text style={styles.detailMemoText}>{selectedTx.memo || '메모 없음'}</Text>
+                    <Ionicons name="chatbubble-outline" size={14} color={colors.inactive} style={{ marginTop: 2 }} />
+                    <ScrollView style={styles.detailMemoScroll} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                      <Text style={styles.detailMemoText}>{selectedTx.memo || '메모 없음'}</Text>
+                    </ScrollView>
                   </View>
 
                   {selectedTx.photoUri && (
@@ -327,9 +326,18 @@ export default function CalendarScreen() {
                     </View>
                   </View>
 
-                  {/* 수정/삭제 버튼 — 내 거래만 */}
+                  <View style={styles.detailDivider} />
+                  <View style={{ flex: 1 }}>
+                  <TxCommentSection
+                    txId={selectedTx.id}
+                    householdId={householdId}
+                    userId={user?.id ?? ''}
+                    userName={myName}
+                    partnerUserId={partnerId ?? undefined}
+                  />
+                  {/* 수정/삭제 버튼 — 내 거래만, 시트 하단 고정 */}
                   {isMe && (
-                    <View style={styles.detailActions}>
+                    <View style={[styles.detailActions, { paddingBottom: Math.max(insets.bottom, 24) }]}>
                       <TouchableOpacity
                         style={styles.editBtn}
                         activeOpacity={0.8}
@@ -365,17 +373,7 @@ export default function CalendarScreen() {
                       </TouchableOpacity>
                     </View>
                   )}
-
-                  <View style={styles.detailDivider} />
-                  <TxCommentSection
-                    txId={selectedTx.id}
-                    householdId={householdId}
-                    userId={user?.id ?? ''}
-                    userName={myName}
-                    partnerUserId={partnerId ?? undefined}
-                    onInputFocus={() => detailScrollRef.current?.scrollToEnd({ animated: true })}
-                  />
-                </ScrollView>
+                  </View>
               </View>
             </KeyboardAvoidingView>
           );
@@ -411,6 +409,7 @@ export default function CalendarScreen() {
                 onChangeText={setEditMemo}
                 placeholder="메모 입력"
                 placeholderTextColor={colors.inactive}
+                maxLength={MEMO_MAX}
               />
               <Text style={styles.editLabel}>시간대</Text>
               <View style={styles.timeChipRow}>
@@ -502,10 +501,10 @@ const styles = StyleSheet.create({
   filterChipActive: {} as any,
   filterText: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
 
-  weekRow: { flexDirection: 'row', paddingHorizontal: 4, marginBottom: 4 },
+  weekRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 4 },
   weekDay: { flex: 1, textAlign: 'center', fontFamily: fonts.semiBold, fontSize: 11, color: colors.textSecondary },
 
-  grid: { flex: 1 },
+  grid: { flex: 1, paddingHorizontal: 16 },
   weekRowGrid: {
     flexDirection: 'row',
     borderTopWidth: 1, borderTopColor: colors.border,
@@ -578,8 +577,8 @@ const styles = StyleSheet.create({
   sheetTotalVal: { fontFamily: fonts.bold, fontSize: 15, color: colors.text },
 
   // 거래 상세 시트 (tcF6p)
-  detailSheetKav: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  detailSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 8, maxHeight: '92%' },
+  detailSheetKav: { position: 'absolute', bottom: 0, left: 0, right: 0, justifyContent: 'flex-end' },
+  detailSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 8 },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 52 },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
   catChipText: { fontFamily: fonts.semiBold, fontSize: 13 },
@@ -590,15 +589,16 @@ const styles = StyleSheet.create({
   expenseTagText: { fontFamily: fonts.medium, fontSize: 11, color: '#E05C5C' },
   detailAmt: { fontFamily: fonts.bold, fontSize: 34, lineHeight: 42, color: colors.text, letterSpacing: -1 },
   detailDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 4 },
-  detailPhoto: { width: '100%', height: 180, borderRadius: 12, marginVertical: 4 },
+  detailPhoto: { width: '100%', height: 120, borderRadius: 12, marginVertical: 4 },
   photoExpandBtn: {
     position: 'absolute', bottom: 12, right: 8,
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center', justifyContent: 'center',
   },
-  detailMemoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
-  detailMemoText: { fontFamily: fonts.regular, fontSize: 14, color: colors.text, flex: 1 },
+  detailMemoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 14 },
+  detailMemoScroll: { flex: 1, maxHeight: 72 },
+  detailMemoText: { fontFamily: fonts.regular, fontSize: 14, color: colors.text, lineHeight: 22 },
   detailRecorderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
   detailRecorderLabel: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
   recorderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100 },

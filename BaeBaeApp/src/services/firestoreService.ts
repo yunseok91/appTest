@@ -13,6 +13,8 @@ export type FirestoreUser = {
   gender: 'male' | 'female';
   householdId: string | null;
   inviteCode: string;
+  inviteCodeNorm?: string;
+  inviteCodeExpiresAt?: string;
   createdAt: Timestamp;
 };
 

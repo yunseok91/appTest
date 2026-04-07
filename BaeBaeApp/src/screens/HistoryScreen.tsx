@@ -1,8 +1,10 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
   ScrollView, Modal, Alert, TextInput, KeyboardAvoidingView, Platform, Image,
+  useWindowDimensions,
 } from 'react-native';
+const MEMO_MAX = 50;
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../theme/colors';
@@ -36,7 +38,7 @@ function TxRow({ tx, onPress }: { tx: Transaction; onPress: () => void }) {
         <Ionicons name={tx.categoryIcon as any} size={18} color={tx.categoryIconColor} />
       </View>
       <View style={styles.txInfo}>
-        <Text style={styles.txMemo}>{tx.memo || tx.category}</Text>
+        <Text style={styles.txMemo} numberOfLines={1} ellipsizeMode="tail">{tx.memo || tx.category}</Text>
         <View style={styles.txMeta}>
           <Text style={styles.txMetaText}>{tx.time} · {tx.category} · </Text>
           <Text style={[styles.txMetaName, { color: colors.primary }]}>{tx.person}</Text>
@@ -57,10 +59,11 @@ function TxRow({ tx, onPress }: { tx: Transaction; onPress: () => void }) {
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetHeight = windowHeight - insets.top - 24;
   const { transactions, deleteTransaction, updateTransaction } = useTransactions();
   const { user, partnerName, householdId, partnerId } = useAuth();
   const { myName: profileName } = useProfile();
-  const detailScrollRef = useRef<import('react-native').ScrollView>(null);
   const [activeFilter, setActiveFilter] = useState<'전체' | '지출' | '수입'>('전체');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [editTx, setEditTx] = useState<Transaction | null>(null);
@@ -222,16 +225,10 @@ export default function HistoryScreen() {
         {selectedTx && (
           <KeyboardAvoidingView
             style={styles.sheetKav}
-            behavior="padding"
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
-            <View style={styles.sheet}>
+            <View style={[styles.sheet, { height: sheetHeight }]}>
               <View style={styles.sheetHandle} />
-              <ScrollView
-                ref={detailScrollRef}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-              >
                 <View style={styles.sheetTopRow}>
                   <View style={[styles.catChip, { backgroundColor: selectedTx.categoryBgColor }]}>
                     <Ionicons name={selectedTx.categoryIcon as any} size={14} color={selectedTx.categoryIconColor} />
@@ -267,7 +264,9 @@ export default function HistoryScreen() {
                 <View style={styles.sheetDivider} />
                 <View style={styles.memoSec}>
                   <Text style={styles.memoLbl}>메모</Text>
-                  <Text style={styles.memoTxt}>{selectedTx.memo || '(메모 없음)'}</Text>
+                  <ScrollView style={styles.memoScroll} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                    <Text style={styles.memoTxt}>{selectedTx.memo || '(메모 없음)'}</Text>
+                  </ScrollView>
                 </View>
                 {selectedTx.photoUri && (
                   <>
@@ -291,48 +290,48 @@ export default function HistoryScreen() {
                   </>
                 )}
                 <View style={styles.sheetDivider} />
-                {selectedTx.person === myName ? (
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      style={styles.editBtn}
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        setEditTx(selectedTx);
-                        setEditAmount(String(selectedTx.amount));
-                        setEditMemo(selectedTx.memo);
-                        setEditTime(selectedTx.time);
-                        setSelectedTx(null);
-                      }}
-                    >
-                      <Text style={styles.editBtnText}>수정</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.delBtn}
-                      activeOpacity={0.8}
-                      onPress={() => Alert.alert('삭제', '이 내역을 삭제할까요?', [
-                        { text: '취소', style: 'cancel' },
-                        { text: '삭제', style: 'destructive', onPress: () => { deleteTransaction(selectedTx.id); setSelectedTx(null); }},
-                      ])}
-                    >
-                      <Text style={styles.delBtnText}>삭제</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.viewOnlyRow}>
-                    <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
-                    <Text style={styles.viewOnlyText}>{selectedTx.person}이(가) 등록한 내역입니다</Text>
-                  </View>
-                )}
-                <View style={styles.sheetDivider} />
-                <TxCommentSection
-                  txId={selectedTx.id}
-                  householdId={householdId}
-                  userId={user?.id ?? ''}
-                  userName={myName}
-                  partnerUserId={partnerId ?? undefined}
-                  onInputFocus={() => detailScrollRef.current?.scrollToEnd({ animated: true })}
-                />
-              </ScrollView>
+                <View style={{ flex: 1 }}>
+                  <TxCommentSection
+                    txId={selectedTx.id}
+                    householdId={householdId}
+                    userId={user?.id ?? ''}
+                    userName={myName}
+                    partnerUserId={partnerId ?? undefined}
+                  />
+                  {/* 수정/삭제 — 내 거래만, 시트 하단 고정 */}
+                  {selectedTx.person === myName ? (
+                    <View style={[styles.actionRow, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+                      <TouchableOpacity
+                        style={styles.editBtn}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setEditTx(selectedTx);
+                          setEditAmount(String(selectedTx.amount));
+                          setEditMemo(selectedTx.memo);
+                          setEditTime(selectedTx.time);
+                          setSelectedTx(null);
+                        }}
+                      >
+                        <Text style={styles.editBtnText}>수정</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.delBtn}
+                        activeOpacity={0.8}
+                        onPress={() => Alert.alert('삭제', '이 내역을 삭제할까요?', [
+                          { text: '취소', style: 'cancel' },
+                          { text: '삭제', style: 'destructive', onPress: () => { deleteTransaction(selectedTx.id); setSelectedTx(null); }},
+                        ])}
+                      >
+                        <Text style={styles.delBtnText}>삭제</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={[styles.viewOnlyRow, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+                      <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
+                      <Text style={styles.viewOnlyText}>{selectedTx.person}이(가) 등록한 내역입니다</Text>
+                    </View>
+                  )}
+                </View>
             </View>
           </KeyboardAvoidingView>
         )}
@@ -442,6 +441,7 @@ export default function HistoryScreen() {
                 onChangeText={setEditMemo}
                 placeholder="메모 입력"
                 placeholderTextColor={colors.inactive}
+                maxLength={MEMO_MAX}
               />
 
               {/* 시간대 */}
@@ -569,12 +569,11 @@ const styles = StyleSheet.create({
 
   // --- Detail sheet ---
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
-  sheetKav: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  sheetKav: { position: 'absolute', bottom: 0, left: 0, right: 0, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.card,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingHorizontal: 20, paddingTop: 12,
-    maxHeight: '92%',
   },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
   sheetTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
@@ -594,9 +593,10 @@ const styles = StyleSheet.create({
   sheetDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginBottom: 14 },
   memoSec: { gap: 4, marginBottom: 14 },
   memoLbl: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
-  memoTxt: { fontFamily: fonts.regular, fontSize: 15, color: colors.text },
+  memoScroll: { maxHeight: 72 },
+  memoTxt: { fontFamily: fonts.regular, fontSize: 15, color: colors.text, lineHeight: 22 },
   photoSec: { gap: 8, marginBottom: 14 },
-  txPhoto: { width: '100%', height: 180, borderRadius: 12 },
+  txPhoto: { width: '100%', height: 120, borderRadius: 12 },
   photoExpandBtn: {
     position: 'absolute', bottom: 8, right: 8,
     width: 32, height: 32, borderRadius: 16,

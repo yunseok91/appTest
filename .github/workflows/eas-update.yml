@@ -1,0 +1,38 @@
+name: EAS OTA Update
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'BaeBaeApp/**'
+
+jobs:
+  update:
+    name: OTA Update (preview)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: BaeBaeApp/package-lock.json
+
+      - name: Install dependencies
+        working-directory: BaeBaeApp
+        run: npm ci
+
+      - name: EAS Update
+        working-directory: BaeBaeApp
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx eas-cli update \
+            --branch preview \
+            --message "Auto deploy: ${{ github.event.head_commit.message }}" \
+            --non-interactive

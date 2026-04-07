@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator,
+  Alert, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,7 +17,6 @@ type Props = {
   userId: string;
   userName: string;
   partnerUserId?: string;
-  onInputFocus?: () => void;
 };
 
 function timeAgo(iso: string): string {
@@ -30,12 +29,13 @@ function timeAgo(iso: string): string {
 
 const localKey = (id: string) => `@baebae_comments_${id}`;
 
-export default function TxCommentSection({ txId, householdId, userId, userName, partnerUserId, onInputFocus }: Props) {
+export default function TxCommentSection({ txId, householdId, userId, userName, partnerUserId }: Props) {
   const [comments, setComments] = useState<TxComment[]>([]);
   const [inputText, setInputText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [sending, setSending] = useState(false);
+  const editInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     setComments([]);
@@ -141,6 +141,11 @@ export default function TxCommentSection({ txId, householdId, userId, userName, 
         </Text>
       </View>
 
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
       {comments.length === 0 ? (
         <Text style={styles.empty}>첫 댓글을 남겨보세요!</Text>
       ) : (
@@ -165,10 +170,10 @@ export default function TxCommentSection({ txId, householdId, userId, userName, 
                 {isEditing ? (
                   <View style={styles.editInline}>
                     <TextInput
+                      ref={editInputRef}
                       style={styles.editInlineInput}
                       value={editText}
                       onChangeText={setEditText}
-                      autoFocus
                       multiline
                     />
                     <View style={styles.editInlineActions}>
@@ -188,7 +193,11 @@ export default function TxCommentSection({ txId, householdId, userId, userName, 
                     {isOwn ? (
                       <>
                         <TouchableOpacity
-                          onPress={() => { setEditingId(c.id); setEditText(c.text); }}
+                          onPress={() => {
+                            setEditingId(c.id);
+                            setEditText(c.text);
+                            setTimeout(() => editInputRef.current?.focus(), 100);
+                          }}
                           style={styles.actionLink}
                         >
                           <Text style={styles.actionLinkText}>수정</Text>
@@ -219,8 +228,9 @@ export default function TxCommentSection({ txId, householdId, userId, userName, 
           );
         })
       )}
+      </ScrollView>
 
-      {/* Input row */}
+      {/* Input row - always pinned at bottom */}
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
@@ -230,8 +240,6 @@ export default function TxCommentSection({ txId, householdId, userId, userName, 
           placeholderTextColor={colors.textMuted}
           returnKeyType="send"
           onSubmitEditing={handleSend}
-          onFocus={() => setTimeout(() => onInputFocus?.(), 150)}
-          blurOnSubmit={false}
           maxLength={200}
         />
         <TouchableOpacity
@@ -251,7 +259,7 @@ export default function TxCommentSection({ txId, householdId, userId, userName, 
 }
 
 const styles = StyleSheet.create({
-  container: { paddingTop: 4, paddingBottom: 8 },
+  container: { flex: 1, paddingTop: 4 },
 
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
   sectionLabel: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textSecondary },

@@ -19,10 +19,16 @@ import { useTransactions } from '../context/TransactionContext';
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const CATEGORY_KR: Record<string, string> = {
-  food: '식비', cafe: '카페', transport: '교통', shopping: '쇼핑',
-  entertainment: '여가', health: '건강', beauty: '미용', education: '교육',
-  travel: '여행', pet: '반려동물', home: '생활', gift: '선물',
-  salary: '급여', allowance: '용돈', interest: '이자', other: '기타',
+  // expense
+  food: '식비', transport: '교통', shopping: '쇼핑', health: '의료/건강',
+  culture: '문화/여가', travel: '여행', utility: '공과금', education: '교육',
+  insurance: '보험', beauty: '미용/관리', exercise: '운동', pet: '반려동물',
+  gift: '선물/경조사', telecom: '통신', housing: '주거', daily: '생활/생필품',
+  savings: '저축/투자', childcare: '육아/자녀', etc: '기타',
+  // income
+  salary: '급여', allowance: '용돈', part_time: '부업', transfer: '이체',
+  // 구버전 데이터 호환
+  cafe: '카페', entertainment: '여가', home: '주거',
 };
 
 function buildCSV(transactions: import('../context/TransactionContext').Transaction[], year: number): string {

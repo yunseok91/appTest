@@ -386,10 +386,12 @@ export default function HomeScreen() {
                 multiline
                 textAlignVertical="top"
                 returnKeyType="done"
+                maxLength={50}
                 onFocus={() => {
                   setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 200);
                 }}
               />
+              <Text style={styles.memoCount}>{memo.length}/50</Text>
             </View>
 
             {/* 액션 버튼 */}
@@ -776,6 +778,10 @@ const styles = StyleSheet.create({
     padding: 0, includeFontPadding: false,
     textAlignVertical: 'top',
     lineHeight: 20,
+  },
+  memoCount: {
+    fontFamily: fonts.regular, fontSize: 11, color: colors.inactive,
+    alignSelf: 'flex-end',
   },
 
   // 액션 행

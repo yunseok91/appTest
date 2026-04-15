@@ -1,0 +1,53 @@
+# GitHub Actions 워크플로우 — CI (Continuous Integration)
+# main 브랜치에 push 또는 PR 올릴 때 자동으로 테스트를 실행
+name: CI — Jest Unit Tests
+
+# 트리거: main 브랜치에 push 하거나 PR 생성 시 자동 실행
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    # GitHub에서 제공하는 ubuntu 가상 서버에서 실행
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. GitHub 레포 코드를 가상 서버에 다운로드
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      # 2. Node.js 20 설치 + package-lock.json 기반으로 npm 캐시 설정 (재설치 속도 향상)
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: BaeBaeApp/package-lock.json
+
+      # 3. node_modules 설치 (npm ci = CI 전용, package-lock.json 기준으로 정확히 설치)
+      - name: 의존성 설치
+        run: npm ci
+        working-directory: BaeBaeApp
+
+      # 4. TypeScript 타입 오류 검사 (빌드 없이 타입만 체크 — --noEmit)
+      - name: TypeScript 타입 체크
+        run: npx tsc --noEmit
+        working-directory: BaeBaeApp
+
+      # 5. Jest 단위 테스트 50개 실행 + 커버리지 측정
+      #    --watchAll=false : CI 환경에서는 watch 모드 비활성화
+      - name: Jest 단위 테스트 실행
+        run: npm test -- --coverage --watchAll=false
+        working-directory: BaeBaeApp
+
+      # 6. 테스트 성공/실패 관계없이(if: always) 커버리지 리포트를 GitHub에 보관
+      #    Actions 탭 → 해당 실행 → Artifacts에서 다운로드 가능
+      - name: 커버리지 리포트 업로드
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: BaeBaeApp/coverage/

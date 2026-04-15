@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Sharing from 'expo-sharing';
-import { File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { colors, fonts } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useProfile } from '../context/ProfileContext';
@@ -49,7 +49,7 @@ function buildCSV(transactions: import('../context/TransactionContext').Transact
     tx.time,
   ].join(','));
 
-  return '\uFEFF' + [header, ...lines].join('\n'); // BOM for Excel UTF-8
+  return '\uFEFF' + [header, ...lines].join('\r\n'); // BOM + CRLF for Excel UTF-8
 }
 
 export default function MyPageScreen() {
@@ -84,28 +84,29 @@ export default function MyPageScreen() {
     if (exporting) return;
     setExporting(true);
     try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert('공유 불가', '이 기기에서는 파일 공유가 지원되지 않습니다.');
-        setExporting(false);
-        return;
-      }
       const csv = buildCSV(transactions, exportYear);
-      const file = new File(Paths.cache, `baebae_${exportYear}.csv`);
-      file.write(csv);
-      await Sharing.shareAsync(file.uri, {
+      const path = `${FileSystem.cacheDirectory}baebae_${exportYear}.csv`;
+      await FileSystem.writeAsStringAsync(path, csv, { encoding: FileSystem.EncodingType.UTF8 });
+      await Sharing.shareAsync(path, {
         mimeType: 'text/csv',
         dialogTitle: `BaeBae ${exportYear}년 거래내역`,
+        UTI: 'public.comma-separated-values-text',
       });
       setShowExport(false);
-    } catch (e) {
-      Alert.alert('오류', '내보내기 중 오류가 발생했습니다.');
+    } catch (e: any) {
+      Alert.alert('오류', e?.message ?? '내보내기 중 오류가 발생했습니다.');
     }
     setExporting(false);
   };
 
+  const CARD_MAX = 5;
+
   const handleAddCard = async () => {
     if (!newAlias.trim()) return;
+    if (cards.length >= CARD_MAX) {
+      Alert.alert('카드 최대 개수 초과', `카드는 최대 ${CARD_MAX}개까지 추가할 수 있어요.`);
+      return;
+    }
     await addCard(newAlias.trim());
     setNewAlias('');
     setShowCardAdd(false);
@@ -229,7 +230,7 @@ export default function MyPageScreen() {
 
         {/* 내 카드 */}
         <View style={styles.sectionCard}>
-          <SectionHeader title="내 카드" />
+          <SectionHeader title="내 카드 (최대 5개 등록 가능합니다)" />
           {cards.map((card, i) => (
             <React.Fragment key={card.id}>
               {i > 0 && <View style={styles.divider} />}
@@ -247,10 +248,17 @@ export default function MyPageScreen() {
             </React.Fragment>
           ))}
           {cards.length > 0 && <View style={styles.divider} />}
-          <TouchableOpacity style={styles.menuItem} onPress={() => { setNewAlias(''); setShowCardAdd(true); }} activeOpacity={0.7}>
-            <Ionicons name="add-circle-outline" size={20} color={colors.primary} style={{ width: 24 }} />
-            <Text style={[styles.menuLabel, { color: colors.primary }]}>카드 추가</Text>
-          </TouchableOpacity>
+          {cards.length < 5 ? (
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setNewAlias(''); setShowCardAdd(true); }} activeOpacity={0.7}>
+              <Ionicons name="add-circle-outline" size={20} color={colors.primary} style={{ width: 24 }} />
+              <Text style={[styles.menuLabel, { color: colors.primary }]}>카드 추가</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.menuItem}>
+              <Ionicons name="checkmark-circle-outline" size={20} color={colors.textMuted} style={{ width: 24 }} />
+              <Text style={[styles.menuLabel, { color: colors.textMuted }]}>최대 5개 등록됨</Text>
+            </View>
+          )}
         </View>
 
         {/* 파트너 & 가계 */}
@@ -405,7 +413,7 @@ export default function MyPageScreen() {
       {/* 내역 내보내기 Bottom Sheet */}
       <Modal visible={showExport} animationType="slide" transparent onRequestClose={() => setShowExport(false)}>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowExport(false)} />
-        <View style={styles.exportSheet}>
+        <View style={[styles.exportSheet, { paddingBottom: sheetBottom }]}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>내역 내보내기</Text>
 
@@ -577,7 +585,7 @@ const styles = StyleSheet.create({
   exportSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: 20, paddingBottom: 36, gap: 16,
+    padding: 20, gap: 16,
   },
 
   // Export sheet

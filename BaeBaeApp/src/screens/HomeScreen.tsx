@@ -64,9 +64,11 @@ export default function HomeScreen() {
   const monthlyIncome = transactions
     .filter(tx => tx.type === 'income' && tx.date.startsWith(monthStr))
     .reduce((s, tx) => s + tx.amount, 0);
-  const monthlyBalance = monthlyIncome - monthlyExpense;
-  const isOverBudget = budget > 0 && monthlyExpense > budget;
+  const hasBudget = budget > 0;
+  const monthlyBalance = hasBudget ? budget - monthlyExpense : monthlyIncome - monthlyExpense;
+  const isOverBudget = hasBudget && monthlyExpense > budget;
 
+  const [showBalTooltip, setShowBalTooltip] = useState(false);
   const [timeSlot, setTimeSlot] = useState<TimeSlot>(getKoreanTimeSlot);
   const [tab, setTab] = useState<TabType>('expense');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -220,7 +222,34 @@ export default function HomeScreen() {
 
           {/* Balance */}
           <View style={styles.balance}>
-            <Text style={styles.balLbl}>이번 달 잔액</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.balLbl}>이번 달 잔액</Text>
+              <View>
+                <TouchableOpacity onPress={() => setShowBalTooltip(v => !v)} hitSlop={8}>
+                  <Ionicons name="information-circle-outline" size={14} color={colors.textSecondary} />
+                </TouchableOpacity>
+                <Modal
+                  visible={showBalTooltip}
+                  transparent
+                  animationType="none"
+                  onRequestClose={() => setShowBalTooltip(false)}
+                >
+                  <TouchableWithoutFeedback onPress={() => setShowBalTooltip(false)}>
+                    <View style={{ flex: 1 }} />
+                  </TouchableWithoutFeedback>
+                </Modal>
+                {showBalTooltip && (
+                  <View style={styles.balTooltip}>
+                    <View style={styles.balTooltipArrow} />
+                    <Text style={styles.balTooltipText}>
+                      {hasBudget
+                        ? '이번달 예산 설정 금액 - 지출로\n계산됩니다.'
+                        : '수입 - 지출로 계산됩니다.'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
             <View style={styles.balAmtRow}>
               <Text style={[styles.balAmt, isOverBudget && { color: colors.secondary }]} allowFontScaling={false}>
                 <Text style={styles.wonSign}>₩</Text>{monthlyBalance.toLocaleString()}
@@ -556,26 +585,28 @@ export default function HomeScreen() {
               <Text style={styles.notiiEmptyText}>새로운 알림이 없어요</Text>
             </View>
           ) : (
-            notifications.map((n) => (
-              <TouchableOpacity
-                key={n.id}
-                style={[styles.notiiItem, !n.read && styles.notiiItemUnread]}
-                activeOpacity={0.7}
-                onPress={() => user && !n.read && markNotificationReadFS(user.id, n.id).catch(() => {})}
-              >
-                <View style={[styles.notiiDot, { backgroundColor: n.read ? colors.border : colors.primary }]} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={[styles.notiiMsg, !n.read && { fontFamily: fonts.semiBold }]}>{n.message}</Text>
-                  <Text style={styles.notiiTime}>{(() => {
-                    const diff = Math.floor((Date.now() - new Date(n.createdAt).getTime()) / 1000);
-                    if (diff < 60) return '방금';
-                    if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
-                    if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
-                    return `${Math.floor(diff / 86400)}일 전`;
-                  })()}</Text>
-                </View>
-              </TouchableOpacity>
-            ))
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {notifications.map((n) => (
+                <TouchableOpacity
+                  key={n.id}
+                  style={[styles.notiiItem, !n.read && styles.notiiItemUnread]}
+                  activeOpacity={0.7}
+                  onPress={() => user && !n.read && markNotificationReadFS(user.id, n.id).catch(() => {})}
+                >
+                  <View style={[styles.notiiDot, { backgroundColor: n.read ? colors.border : colors.primary }]} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={[styles.notiiMsg, !n.read && { fontFamily: fonts.semiBold }]}>{n.message}</Text>
+                    <Text style={styles.notiiTime}>{(() => {
+                      const diff = Math.floor((Date.now() - new Date(n.createdAt).getTime()) / 1000);
+                      if (diff < 60) return '방금';
+                      if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
+                      if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
+                      return `${Math.floor(diff / 86400)}일 전`;
+                    })()}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           )}
         </View>
       </Modal>
@@ -638,7 +669,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 8,
-    gap: 22,
+    gap: 14,
   },
 
   // Header
@@ -659,10 +690,13 @@ const styles = StyleSheet.create({
   avatarName: { fontFamily: fonts.medium, fontSize: 11, color: colors.textSecondary },
 
   // Balance
-  balance: { gap: 10 },
+  balance: { gap: 6 },
   balLbl: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  balTooltip: { position: 'absolute', top: -6, left: 22, backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, zIndex: 100, minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 6 },
+  balTooltipArrow: { position: 'absolute', top: 10, left: -5, width: 0, height: 0, borderTopWidth: 5, borderBottomWidth: 5, borderRightWidth: 5, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: '#fff' },
+  balTooltipText: { fontFamily: fonts.regular, fontSize: 11, color: '#1A1918', lineHeight: 17 },
   balAmtRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  balAmt: { fontFamily: fonts.bold, fontSize: 30, color: colors.text, letterSpacing: 0 },
+  balAmt: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, letterSpacing: 0 },
   wonSign: { fontFamily: undefined },  // Outfit폰트 ₩ 미지원 → 시스템 폰트로 렌더링, fontSize는 부모에서 상속
   overBudgetBubble: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -690,8 +724,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 24,
     paddingHorizontal: 20,
-    paddingVertical: 24,
-    gap: 14,
+    paddingVertical: 18,
+    gap: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.07,
@@ -769,8 +803,8 @@ const styles = StyleSheet.create({
   memoField: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8,
     backgroundColor: colors.background, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 16,
-    minHeight: 64,
+    paddingHorizontal: 14, paddingVertical: 12,
+    minHeight: 52,
   },
   memoInput: {
     flex: 1,
@@ -785,7 +819,7 @@ const styles = StyleSheet.create({
   },
 
   // 액션 행
-  actionRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingTop: 4 },
+  actionRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   photoBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: colors.background, borderRadius: 12,
@@ -840,7 +874,7 @@ const styles = StyleSheet.create({
   notiiBadgeText: { fontFamily: fonts.bold, fontSize: 10, color: '#FFFFFF' },
 
   // 알림 시트
-  notiiSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
+  notiiSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '75%', backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
   notiiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 44, marginBottom: 4 },
   notiiTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
   notiiReadAll: { fontFamily: fonts.medium, fontSize: 13, color: colors.primary },

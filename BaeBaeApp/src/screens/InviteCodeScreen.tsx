@@ -4,8 +4,9 @@ import {
   TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView, Clipboard, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
@@ -16,6 +17,7 @@ import { useProfile } from '../context/ProfileContext';
 import { syncUser, joinHouseholdByCode } from '../services/firestoreService';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'InviteCode'>;
+type RouteParams = RouteProp<RootStackParamList, 'InviteCode'>;
 
 const INVITE_CODE_KEY = '@baebae_invite_code';
 
@@ -28,10 +30,11 @@ function generateCode(): string {
 
 export default function InviteCodeScreen() {
   const navigation = useNavigation<Nav>();
+  const route = useRoute<RouteParams>();
   const { user, setHouseholdId, householdId, isOnboarded } = useAuth();
   const { myGender } = useProfile();
   const [myCode, setMyCode] = useState('');
-  const [inputCode, setInputCode] = useState('');
+  const [inputCode, setInputCode] = useState(route.params?.initialCode ?? '');
   const [alertType, setAlertType] = useState<null | 'fail'>(null);
   const [failReason, setFailReason] = useState('');
   const [copied, setCopied] = useState(false);

@@ -327,7 +327,7 @@ export const subscribeTransactions = (
   const col = collection(db, 'households', householdId, 'transactions');
   return onSnapshot(col, (snap) => {
     const txs = snap.docs
-      .map(d => d.data() as Transaction)
+      .map(d => ({ ...d.data(), id: d.id } as Transaction))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     callback(txs);
   });

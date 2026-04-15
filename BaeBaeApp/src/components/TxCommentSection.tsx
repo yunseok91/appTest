@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, ScrollView,
+  Alert, ActivityIndicator, ScrollView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -149,7 +149,7 @@ export default function TxCommentSection({ txId, householdId, userId, userName, 
       {comments.length === 0 ? (
         <Text style={styles.empty}>첫 댓글을 남겨보세요!</Text>
       ) : (
-        comments.map(c => {
+        [...comments].reverse().map(c => {
           const isOwn = c.authorId === userId;
           const liked = c.likes.includes(userId);
           const isEditing = editingId === c.id;
@@ -316,7 +316,9 @@ const styles = StyleSheet.create({
   input: {
     flex: 1, minHeight: 40, maxHeight: 100,
     backgroundColor: colors.canvas, borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 11 : 8,
+    paddingBottom: Platform.OS === 'ios' ? 11 : 8,
     fontFamily: fonts.regular, fontSize: 14, color: colors.text,
   },
   sendBtn: {

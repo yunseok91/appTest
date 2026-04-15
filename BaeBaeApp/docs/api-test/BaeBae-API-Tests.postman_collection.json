@@ -1,0 +1,449 @@
+{
+  "info": {
+    "name": "BaeBae API Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Firebase REST API 테스트 컬렉션 — BaeBae 커플 가계부 앱"
+  },
+  "item": [
+    {
+      "name": "0. 인증",
+      "item": [
+        {
+          "name": "로그인 — ID Token 발급",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('idToken 필드 존재', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.idToken).to.be.a('string');",
+                  "  pm.expect(body.idToken.length).to.be.greaterThan(0);",
+                  "  // 다음 요청에서 사용할 수 있도록 환경변수에 저장",
+                  "  pm.environment.set('ID_TOKEN', body.idToken);",
+                  "});",
+                  "",
+                  "pm.test('localId(userId) 존재', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.localId).to.be.a('string');",
+                  "  pm.environment.set('USER_ID', body.localId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{API_KEY}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@baebae.com\",\n  \"password\": \"Test1234!\",\n  \"returnSecureToken\": true\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. 거래 (Transactions)",
+      "item": [
+        {
+          "name": "거래 목록 조회",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('응답이 배열 형태', () => {",
+                  "  const body = pm.response.json();",
+                  "  // Firestore 목록은 documents 배열 또는 빈 객체 반환",
+                  "  const isArray = Array.isArray(body.documents) || Array.isArray(body);",
+                  "  pm.expect(isArray || typeof body === 'object').to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('응답 시간 2초 이내', () => {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/households/{{HOUSEHOLD_ID}}/transactions",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" }]
+          }
+        },
+        {
+          "name": "거래 등록",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('문서 name(id 경로) 반환', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.name).to.include('transactions/');",
+                  "  // TX_ID 추출해서 환경변수 저장",
+                  "  const parts = body.name.split('/');",
+                  "  pm.environment.set('TX_ID', parts[parts.length - 1]);",
+                  "});",
+                  "",
+                  "pm.test('amount 필드 정상 저장', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.amount.integerValue).to.equal('5000');",
+                  "});",
+                  "",
+                  "pm.test('type 필드가 expense 또는 income', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(['expense', 'income']).to.include(fields.type.stringValue);",
+                  "});",
+                  "",
+                  "pm.test('필수 필드 모두 존재 (date, time, person, payMethod)', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.date).to.exist;",
+                  "  pm.expect(fields.time).to.exist;",
+                  "  pm.expect(fields.person).to.exist;",
+                  "  pm.expect(fields.payMethod).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/households/{{HOUSEHOLD_ID}}/transactions",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"type\":          { \"stringValue\": \"expense\" },\n    \"category\":      { \"stringValue\": \"식비\" },\n    \"categoryKey\":   { \"stringValue\": \"food\" },\n    \"categoryIcon\":  { \"stringValue\": \"restaurant-outline\" },\n    \"categoryIconColor\": { \"stringValue\": \"#E8956D\" },\n    \"categoryBgColor\":   { \"stringValue\": \"#FDF2EC\" },\n    \"amount\":        { \"integerValue\": \"5000\" },\n    \"memo\":          { \"stringValue\": \"API 테스트 거래\" },\n    \"date\":          { \"stringValue\": \"2026-04-13\" },\n    \"time\":          { \"stringValue\": \"점심\" },\n    \"person\":        { \"stringValue\": \"테스트유저\" },\n    \"payMethod\":     { \"stringValue\": \"cash\" },\n    \"createdAt\":     { \"stringValue\": \"2026-04-13T00:00:00.000Z\" }\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "등록된 거래 단건 조회",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('조회된 문서 name에 TX_ID 포함', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.name).to.include(pm.environment.get('TX_ID'));",
+                  "});",
+                  "",
+                  "pm.test('amount 값 일치 (5000)', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.amount.integerValue).to.equal('5000');",
+                  "});",
+                  "",
+                  "// ⭐ 핵심 TC: 파트너 버그 재현 검증",
+                  "// 이전에 d.data()만 반환 시 id 필드 누락 → 댓글 경로 오류 발생",
+                  "pm.test('[버그 검증] 문서 name 경로에서 id 추출 가능', () => {",
+                  "  const body = pm.response.json();",
+                  "  const parts = body.name.split('/');",
+                  "  const docId = parts[parts.length - 1];",
+                  "  pm.expect(docId).to.be.a('string');",
+                  "  pm.expect(docId.length).to.be.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/households/{{HOUSEHOLD_ID}}/transactions/{{TX_ID}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" }]
+          }
+        },
+        {
+          "name": "거래 수정",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('수정된 amount 반영 (9900)', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.amount.integerValue).to.equal('9900');",
+                  "});",
+                  "",
+                  "pm.test('수정된 memo 반영', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.memo.stringValue).to.equal('API 테스트 수정됨');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": "{{BASE_URL}}/households/{{HOUSEHOLD_ID}}/transactions/{{TX_ID}}?updateMask.fieldPaths=amount&updateMask.fieldPaths=memo",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"amount\": { \"integerValue\": \"9900\" },\n    \"memo\":   { \"stringValue\": \"API 테스트 수정됨\" }\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "거래 삭제",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK (삭제 성공)', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('응답 body가 빈 객체 (Firestore 삭제 응답)', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(Object.keys(body).length).to.equal(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{BASE_URL}}/households/{{HOUSEHOLD_ID}}/transactions/{{TX_ID}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" }]
+          }
+        },
+        {
+          "name": "삭제된 거래 재조회 (404 확인)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('삭제된 문서 조회 시 404 반환', () => {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('오류 메시지에 NOT_FOUND 포함', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(JSON.stringify(body)).to.include('NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/households/{{HOUSEHOLD_ID}}/transactions/{{TX_ID}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. 댓글 (Comments)",
+      "item": [
+        {
+          "name": "댓글 등록",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// 댓글 테스트용 거래를 먼저 등록 (TX_ID가 삭제된 상태이므로)",
+                  "// TX_ID가 없으면 이 TC 전에 '거래 등록' TC를 다시 실행하세요"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('댓글 문서 name 반환', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.name).to.include('comments/');",
+                  "  const parts = body.name.split('/');",
+                  "  pm.environment.set('COMMENT_ID', parts[parts.length - 1]);",
+                  "});",
+                  "",
+                  "pm.test('text 필드 정상 저장', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.text.stringValue).to.equal('API 테스트 댓글');",
+                  "});",
+                  "",
+                  "pm.test('authorId 필드 존재', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.authorId).to.exist;",
+                  "  pm.expect(fields.authorId.stringValue.length).to.be.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/households/{{HOUSEHOLD_ID}}/transactions/{{TX_ID}}/comments",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"text\":       { \"stringValue\": \"API 테스트 댓글\" },\n    \"authorId\":   { \"stringValue\": \"{{USER_ID}}\" },\n    \"authorName\": { \"stringValue\": \"테스트유저\" },\n    \"likes\":      { \"arrayValue\": { \"values\": [] } },\n    \"createdAt\":  { \"stringValue\": \"2026-04-13T00:00:00.000Z\" }\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "댓글 목록 조회",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('댓글 목록 반환 (배열 또는 빈 객체)', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(Array.isArray(body.documents) || typeof body === 'object').to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/households/{{HOUSEHOLD_ID}}/transactions/{{TX_ID}}/comments",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" }]
+          }
+        },
+        {
+          "name": "댓글 수정",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('수정된 text 반영', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.text.stringValue).to.equal('API 테스트 댓글 수정됨');",
+                  "});",
+                  "",
+                  "pm.test('updatedAt 필드 존재', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.updatedAt).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": "{{BASE_URL}}/households/{{HOUSEHOLD_ID}}/transactions/{{TX_ID}}/comments/{{COMMENT_ID}}?updateMask.fieldPaths=text&updateMask.fieldPaths=updatedAt",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"text\":      { \"stringValue\": \"API 테스트 댓글 수정됨\" },\n    \"updatedAt\": { \"stringValue\": \"2026-04-13T01:00:00.000Z\" }\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "댓글 삭제",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK (삭제 성공)', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{BASE_URL}}/households/{{HOUSEHOLD_ID}}/transactions/{{TX_ID}}/comments/{{COMMENT_ID}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. 유저 (Users)",
+      "item": [
+        {
+          "name": "유저 정보 조회",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('응답 200 OK', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('name 필드 존재', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.name).to.exist;",
+                  "});",
+                  "",
+                  "pm.test('inviteCode 필드 존재', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.inviteCode).to.exist;",
+                  "});",
+                  "",
+                  "pm.test('householdId 필드 존재', () => {",
+                  "  const fields = pm.response.json().fields;",
+                  "  pm.expect(fields.householdId).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/users/pNZfFCdKziWAPvRBZDLd7PzeZ3v1",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" }]
+          }
+        }
+      ]
+    }
+  ]
+}

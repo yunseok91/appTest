@@ -1,0 +1,13 @@
+{
+    "configurations": [
+        {
+            "name": "Run iOS",
+            "cwd": "${workspaceFolder}",
+            "type": "reactnative",
+            "request": "launch",
+            "platform": "ios",
+            "enableDebug": false,
+            "isDynamic": true
+        }
+    ]
+}

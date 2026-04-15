@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Linking from 'expo-linking';
 import { colors, fonts } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { navigationRef } from './navigationRef';
@@ -25,11 +26,11 @@ export type RootStackParamList = {
   Login: undefined;
   CoupleIcon: undefined;
   ProfileSetup: { type: 'couple'; gender: 'male' | 'female' };
-  InviteCode: undefined;
+  InviteCode: { initialCode?: string } | undefined;
   HouseholdName: { isConnected?: boolean; gender?: 'male' | 'female' } | undefined;
   MainTabs: undefined;
   RenameHousehold: undefined;
-  PartnerInvite: undefined;
+  PartnerInvite: { initialCode?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -101,6 +102,44 @@ function MainTabs() {
 export default function AppNavigator() {
   const { user, isLoading, isOnboarded, partnerName, partnerConnectedAlert, clearPartnerAlert, partnerDisconnectedAlert, clearPartnerDisconnectedAlert, partnerBudgetAlert, clearPartnerBudgetAlert, forcedLogoutAlert, clearForcedLogoutAlert } = useAuth();
   const prevIsOnboarded = useRef(isOnboarded);
+
+  // 딥링크 pending 코드 — cold-start 시 user 로딩 전에 URL이 도착하면 여기 저장
+  const pendingInviteCode = useRef<string | null>(null);
+
+  const navigateInvite = (code: string): boolean => {
+    if (!navigationRef.isReady() || !user) return false;
+    if (isOnboarded) {
+      navigationRef.navigate('PartnerInvite', { initialCode: code });
+    } else {
+      navigationRef.navigate('InviteCode', { initialCode: code });
+    }
+    return true;
+  };
+
+  // user/isOnboarded 확정 후 pending 코드 처리 (cold-start 대응)
+  useEffect(() => {
+    if (pendingInviteCode.current && user && !isLoading) {
+      const ok = navigateInvite(pendingInviteCode.current);
+      if (ok) pendingInviteCode.current = null;
+    }
+  }, [user, isOnboarded, isLoading]);
+
+  // 딥링크 리스너 — 앱 최초 1회 등록
+  useEffect(() => {
+    const handleUrl = (url: string) => {
+      const parsed = Linking.parse(url);
+      if (parsed.path !== 'invite') return;
+      const code = parsed.queryParams?.code ? String(parsed.queryParams.code) : undefined;
+      if (!code) return;
+      // 즉시 이동 가능하면 이동, 아니면 pending에 저장 (user 로딩 후 처리)
+      const ok = navigateInvite(code);
+      if (!ok) pendingInviteCode.current = code;
+    };
+
+    const sub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    Linking.getInitialURL().then(url => { if (url) handleUrl(url); });
+    return () => sub.remove();
+  }, []); // 리스너는 마운트 시 1회만 등록
 
   useEffect(() => {
     if (user && isOnboarded && !prevIsOnboarded.current) {

@@ -74,3 +74,27 @@ jobs:
             --branch preview \
             --message "Auto deploy: ${{ github.event.head_commit.message }}" \
             --non-interactive
+
+      - name: Slack 배포 완료 알림
+        if: success()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "✅ *BaeBaeApp OTA 배포 완료*\n커밋: `${{ github.event.head_commit.message }}`\n브랜치: `${{ github.ref_name }}`\n작성자: ${{ github.actor }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Slack 배포 실패 알림
+        if: failure()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "❌ *BaeBaeApp 배포 실패*\n커밋: `${{ github.event.head_commit.message }}`\n작성자: ${{ github.actor }}\n확인: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

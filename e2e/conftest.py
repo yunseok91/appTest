@@ -24,7 +24,7 @@ def driver():
     options.auto_grant_permissions = True
 
     drv = webdriver.Remote(APPIUM_SERVER, options=options)
-    drv.implicitly_wait(5)
+    drv.implicitly_wait(0)  # 명시적 대기(wait_text)만 사용 — implicit wait은 실패마다 지연 유발
     time.sleep(3)  # 앱 초기 로딩 대기
 
     yield drv

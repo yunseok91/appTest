@@ -65,7 +65,8 @@ function CustomTabBar({ state, navigation }: any) {
 
         if (item?.isCenter) {
           return (
-            <TouchableOpacity key={route.key} onPress={onPress} style={styles.centerTabBtn} activeOpacity={0.85}>
+            <TouchableOpacity key={route.key} onPress={onPress} style={styles.centerTabBtn} activeOpacity={0.85}
+              accessibilityLabel={item?.label}>
               <View style={[styles.centerCircle, isFocused && styles.centerCircleActive]}>
                 <Ionicons name="calendar-outline" size={24} color={colors.white} />
               </View>

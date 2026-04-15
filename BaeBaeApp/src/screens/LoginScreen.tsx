@@ -82,6 +82,7 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
+            testID="login-btn-google"
             style={[styles.googleBtn, loading && styles.googleBtnDisabled]}
             onPress={handleGoogleSignIn}
             disabled={loading}
@@ -98,7 +99,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           {__DEV__ && (
-            <TouchableOpacity style={styles.devBtn} onPress={handleDevBypass}>
+            <TouchableOpacity testID="login-btn-dev-bypass" style={styles.devBtn} onPress={handleDevBypass}>
               <Text style={styles.devBtnText}>🛠 개발 모드 진입</Text>
             </TouchableOpacity>
           )}

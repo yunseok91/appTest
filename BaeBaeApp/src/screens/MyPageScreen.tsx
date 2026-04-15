@@ -155,7 +155,7 @@ export default function MyPageScreen() {
   );
 
   const MenuItem = ({
-    icon, label, right, onPress, disabled, color,
+    icon, label, right, onPress, disabled, color, testID,
   }: {
     icon: keyof typeof Ionicons.glyphMap;
     label: string;
@@ -163,8 +163,10 @@ export default function MyPageScreen() {
     onPress?: () => void;
     disabled?: boolean;
     color?: string;
+    testID?: string;
   }) => (
     <TouchableOpacity
+      testID={testID}
       style={[styles.menuItem, disabled && styles.menuItemDisabled]}
       onPress={disabled ? undefined : onPress}
       activeOpacity={disabled ? 1 : 0.7}
@@ -249,6 +251,7 @@ export default function MyPageScreen() {
             )}
           </View>
           <TouchableOpacity
+            testID="mypage-btn-budget-edit"
             style={styles.budgetEditBtn}
             activeOpacity={0.8}
             onPress={() => { setBudgetInput(budget > 0 ? String(budget) : ''); setShowBudgetEdit(true); }}
@@ -267,6 +270,7 @@ export default function MyPageScreen() {
                 <Ionicons name="card-outline" size={20} color={colors.text} style={{ width: 24 }} />
                 <Text style={[styles.menuLabel]}>{card.alias}</Text>
                 <TouchableOpacity
+                  testID={`mypage-btn-card-delete-${card.id}`}
                   style={styles.cardDelBtn}
                   onPress={() => deleteCard(card.id)}
                   activeOpacity={0.8}
@@ -278,7 +282,7 @@ export default function MyPageScreen() {
           ))}
           {cards.length > 0 && <View style={styles.divider} />}
           {cards.length < 5 ? (
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setNewAlias(''); setShowCardAdd(true); }} activeOpacity={0.7}>
+            <TouchableOpacity testID="mypage-btn-card-add" style={styles.menuItem} onPress={() => { setNewAlias(''); setShowCardAdd(true); }} activeOpacity={0.7}>
               <Ionicons name="add-circle-outline" size={20} color={colors.primary} style={{ width: 24 }} />
               <Text style={[styles.menuLabel, { color: colors.primary }]}>카드 추가</Text>
             </TouchableOpacity>
@@ -293,12 +297,12 @@ export default function MyPageScreen() {
         {/* 파트너 & 가계 */}
         <View style={styles.sectionCard}>
           <SectionHeader title="파트너 & 가계" />
-          <MenuItem icon="pencil-outline" label="가계명 변경" onPress={() => navigation.navigate('RenameHousehold')} />
+          <MenuItem testID="mypage-btn-rename-household" icon="pencil-outline" label="가계명 변경" onPress={() => navigation.navigate('RenameHousehold')} />
           <View style={styles.divider} />
           {householdId && partnerName ? (
-            <MenuItem icon="person-remove-outline" label="파트너 연결 끊기" onPress={() => setShowDisconnect(true)} color="#C47B6A" />
+            <MenuItem testID="mypage-btn-partner-disconnect" icon="person-remove-outline" label="파트너 연결 끊기" onPress={() => setShowDisconnect(true)} color="#C47B6A" />
           ) : (
-            <MenuItem icon="person-add-outline" label="파트너 초대" onPress={() => navigation.getParent()?.navigate('PartnerInvite')} />
+            <MenuItem testID="mypage-btn-partner-invite" icon="person-add-outline" label="파트너 초대" onPress={() => navigation.getParent()?.navigate('PartnerInvite')} />
           )}
         </View>
 
@@ -306,6 +310,7 @@ export default function MyPageScreen() {
         <View style={styles.sectionCard}>
           <SectionHeader title="데이터" />
           <MenuItem
+            testID="mypage-btn-export-csv"
             icon="download-outline"
             label="내역 내보내기 (CSV)"
             onPress={() => { setExportYear(currentYear); setShowExport(true); }}
@@ -347,6 +352,7 @@ export default function MyPageScreen() {
           <View style={styles.divider} />
 
           <MenuItem
+            testID="mypage-btn-privacy-policy"
             icon="document-text-outline"
             label="개인정보처리방침"
             onPress={() => Alert.alert('개인정보처리방침', '준비 중입니다.')}
@@ -356,6 +362,7 @@ export default function MyPageScreen() {
         {/* 계정 */}
         <View style={styles.sectionCard}>
           <TouchableOpacity
+            testID="mypage-btn-logout"
             style={styles.menuItem}
             onPress={() => Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
               { text: '취소', style: 'cancel' },
@@ -367,7 +374,7 @@ export default function MyPageScreen() {
             <Text style={[styles.menuLabel, { color: colors.secondary }]}>로그아웃</Text>
           </TouchableOpacity>
           <View style={styles.divider} />
-          <TouchableOpacity style={styles.menuItem} onPress={() => setShowWithdraw(true)} activeOpacity={0.7}>
+          <TouchableOpacity testID="mypage-btn-withdraw" style={styles.menuItem} onPress={() => setShowWithdraw(true)} activeOpacity={0.7}>
             <Ionicons name="trash-outline" size={20} color="#C47B6A" style={{ width: 24 }} />
             <Text style={[styles.menuLabel, { color: '#C47B6A' }]}>회원탈퇴</Text>
           </TouchableOpacity>
@@ -385,6 +392,7 @@ export default function MyPageScreen() {
             <View style={styles.cardInputRow}>
               <Ionicons name="card-outline" size={18} color={colors.textSecondary} />
               <TextInput
+                testID="mypage-input-card-alias"
                 style={styles.cardInput}
                 value={newAlias}
                 onChangeText={setNewAlias}
@@ -396,6 +404,7 @@ export default function MyPageScreen() {
               />
             </View>
             <TouchableOpacity
+              testID="mypage-btn-card-add-confirm"
               style={[styles.addBtn, !newAlias.trim() && { opacity: 0.4 }]}
               onPress={handleAddCard}
               disabled={!newAlias.trim()}
@@ -417,6 +426,7 @@ export default function MyPageScreen() {
             <View style={styles.cardInputRow}>
               <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: colors.text }}>₩</Text>
               <TextInput
+                testID="mypage-input-budget"
                 style={styles.cardInput}
                 value={budgetInput !== '' ? Number(budgetInput).toLocaleString('ko-KR') : ''}
                 onChangeText={(t) => setBudgetInput(t.replace(/[^0-9]/g, ''))}
@@ -429,6 +439,7 @@ export default function MyPageScreen() {
               />
             </View>
             <TouchableOpacity
+              testID="mypage-btn-budget-save"
               style={styles.addBtn}
               onPress={handleSaveBudget}
               activeOpacity={0.85}
@@ -452,6 +463,7 @@ export default function MyPageScreen() {
             {yearOptions.map(y => (
               <TouchableOpacity
                 key={y}
+                testID={`mypage-btn-export-year-${y}`}
                 style={[styles.yearBtn, exportYear === y && styles.yearBtnActive]}
                 onPress={() => setExportYear(y)}
                 activeOpacity={0.7}
@@ -464,6 +476,7 @@ export default function MyPageScreen() {
           </View>
 
           <TouchableOpacity
+            testID="mypage-btn-export-confirm"
             style={[styles.addBtn, exporting && { opacity: 0.4 }]}
             onPress={handleExport}
             disabled={exporting}
@@ -485,10 +498,11 @@ export default function MyPageScreen() {
             <Text style={styles.withdrawTitle}>파트너 연결을 끊겠습니까?</Text>
             <Text style={styles.withdrawSub}>파트너 데이터는 삭제됩니다.{'\n'}이 작업은 되돌릴 수 없습니다.</Text>
             <View style={styles.withdrawBtns}>
-              <TouchableOpacity style={styles.withdrawCancel} onPress={() => setShowDisconnect(false)} activeOpacity={0.8}>
+              <TouchableOpacity testID="mypage-btn-disconnect-cancel" style={styles.withdrawCancel} onPress={() => setShowDisconnect(false)} activeOpacity={0.8}>
                 <Text style={styles.withdrawCancelText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="mypage-btn-disconnect-confirm"
                 style={styles.withdrawConfirm}
                 onPress={async () => {
                   try {
@@ -516,10 +530,11 @@ export default function MyPageScreen() {
             <Text style={styles.withdrawTitle}>정말 탈퇴하시겠어요?</Text>
             <Text style={styles.withdrawSub}>탈퇴 시 모든 데이터가 삭제되며{'\n'}복구할 수 없습니다.</Text>
             <View style={styles.withdrawBtns}>
-              <TouchableOpacity style={styles.withdrawCancel} onPress={() => setShowWithdraw(false)} activeOpacity={0.8}>
+              <TouchableOpacity testID="mypage-btn-withdraw-cancel" style={styles.withdrawCancel} onPress={() => setShowWithdraw(false)} activeOpacity={0.8}>
                 <Text style={styles.withdrawCancelText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="mypage-btn-withdraw-confirm"
                 style={styles.withdrawConfirm}
                 onPress={async () => {
                   try {

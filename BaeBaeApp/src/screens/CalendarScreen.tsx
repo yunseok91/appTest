@@ -117,10 +117,11 @@ export default function CalendarScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={prevMonth} style={styles.navBtn}>
+        <TouchableOpacity testID="calendar-btn-month-prev" onPress={prevMonth} style={styles.navBtn}>
           <Ionicons name="chevron-back" size={20} color={colors.text} />
         </TouchableOpacity>
         <TouchableOpacity
+          testID="calendar-btn-month-select"
           style={styles.monthTitleBtn}
           onPress={() => { setPickYearIdx(YEARS.indexOf(year)); setPickMonthIdx(month); setShowYMPicker(true); }}
           activeOpacity={0.8}
@@ -128,7 +129,7 @@ export default function CalendarScreen() {
           <Text style={styles.monthTitle} allowFontScaling={false}>{year}년 {month + 1}월</Text>
           <Ionicons name="chevron-down" size={14} color={colors.text} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={nextMonth} style={styles.navBtn}>
+        <TouchableOpacity testID="calendar-btn-month-next" onPress={nextMonth} style={styles.navBtn}>
           <Ionicons name="chevron-forward" size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -138,6 +139,7 @@ export default function CalendarScreen() {
         {([['all', '전체'], ['me', myName], ['partner', partnerName || '파트너']] as [PersonFilter, string][]).map(([key, label]) => (
           <TouchableOpacity
             key={key}
+            testID={`calendar-btn-filter-${key}`}
             style={[styles.filterChip, filter === key && filterChipActive(key)]}
             onPress={() => setFilter(key)}
             activeOpacity={0.8}
@@ -175,6 +177,7 @@ export default function CalendarScreen() {
               return (
                 <TouchableOpacity
                   key={key}
+                  testID={`calendar-btn-day-${key}`}
                   style={[styles.cell, isToday(day) && styles.cellToday]}
                   onPress={() => hasTx && setSelectedDay(key)}
                   activeOpacity={hasTx ? 0.7 : 1}
@@ -223,6 +226,7 @@ export default function CalendarScreen() {
                   return (
                   <TouchableOpacity
                     key={tx.id}
+                    testID={`calendar-btn-tx-${tx.id}`}
                     style={styles.txRow}
                     activeOpacity={0.7}
                     onPress={() => {
@@ -280,7 +284,7 @@ export default function CalendarScreen() {
                       <Ionicons name={selectedTx.categoryIcon as any} size={14} color={selectedTx.categoryIconColor} />
                       <Text style={[styles.catChipText, { color: selectedTx.categoryIconColor }]}>{selectedTx.category}</Text>
                     </View>
-                    <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedTx(null)}>
+                    <TouchableOpacity testID="calendar-btn-detail-close" style={styles.closeBtn} onPress={() => setSelectedTx(null)}>
                       <Ionicons name="close" size={16} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
@@ -309,7 +313,8 @@ export default function CalendarScreen() {
                     <>
                       <View style={styles.detailDivider} />
                       <TouchableOpacity
-                        onPress={() => {
+                        testID="calendar-btn-photo-expand"
+                      onPress={() => {
                           const uri = selectedTx.photoUri!;
                           setSelectedTx(null);
                           setViewPhotoUri(uri);
@@ -351,6 +356,7 @@ export default function CalendarScreen() {
                     {isMe ? (
                       <View style={styles.detailActions}>
                         <TouchableOpacity
+                          testID="calendar-btn-edit"
                           style={styles.editBtn}
                           activeOpacity={0.8}
                           onPress={() => {
@@ -364,6 +370,7 @@ export default function CalendarScreen() {
                           <Text style={styles.editBtnText}>수정</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
+                          testID="calendar-btn-delete"
                           style={styles.deleteBtn}
                           activeOpacity={0.8}
                           onPress={() => {
@@ -415,7 +422,7 @@ export default function CalendarScreen() {
           <View style={styles.sheetHandle} />
           <View style={styles.ymHeader}>
             <Text style={styles.ymTitle}>날짜 선택</Text>
-            <TouchableOpacity onPress={() => setShowYMPicker(false)}>
+            <TouchableOpacity testID="calendar-btn-ympicker-close" onPress={() => setShowYMPicker(false)}>
               <Ionicons name="close" size={18} color={colors.text} />
             </TouchableOpacity>
           </View>
@@ -425,6 +432,7 @@ export default function CalendarScreen() {
             <WheelPicker items={MONTHS} selectedIndex={pickMonthIdx} onSelect={setPickMonthIdx} format={(v) => `${v}월`} />
           </View>
           <TouchableOpacity
+            testID="calendar-btn-ympicker-confirm"
             style={styles.ymConfirmBtn}
             onPress={() => { setCurrentDate(new Date(YEARS[pickYearIdx], MONTHS[pickMonthIdx] - 1, 1)); setShowYMPicker(false); }}
             activeOpacity={0.85}

@@ -13,7 +13,7 @@ class HistoryPage(BasePage):
     def navigate(self):
         from appium.webdriver.common.appiumby import AppiumBy
 
-        # 1순위: accessibilityLabel 기반 (AppNavigator에 label 추가 후 OTA 배포 시 동작)
+        # 1순위: accessibilityLabel 기반 (AppNavigator에 accessibilityLabel 추가 후 OTA 시 동작)
         try:
             self.driver.find_element(AppiumBy.ACCESSIBILITY_ID, '내역').click()
             self.wait_text('거래 내역', timeout=5)
@@ -21,20 +21,34 @@ class HistoryPage(BasePage):
         except Exception:
             pass
 
-        # 2순위: 좌표 기반 (탭바 텍스트 없는 경우 fallback)
-        # 5개 탭 중 2번째(내역) x 중앙 = 화면너비 / 5 * 1.5
-        # y는 디바이스마다 달라 여러 비율 시도
-        size = self.driver.get_window_size()
-        w, h = size['width'], size['height']
-        x = int(w / 5 * 1.5)
+        # 2순위: 탭바 버튼 동적 탐색
+        # — 탭바 아이콘은 content-desc="" 이라 텍스트/ID 탐색 불가
+        # — 화면에서 클릭 가능한 요소 중 y좌표가 가장 아래에 몰려있는 그룹 = 탭바
+        all_clickable = self.driver.find_elements(
+            AppiumBy.ANDROID_UIAUTOMATOR,
+            'new UiSelector().clickable(true)'
+        )
 
-        for y_ratio in [0.97, 0.95, 0.93, 0.90]:
-            self.driver.tap([(x, int(h * y_ratio))])
-            time.sleep(0.5)
-            if self.is_text_present('거래 내역', timeout=3):
-                return
+        if not all_clickable:
+            raise TimeoutError('클릭 가능한 요소를 찾을 수 없음')
 
-        raise TimeoutError('내역 탭 이동 실패 — 화면에서 "거래 내역" 헤더를 찾을 수 없음')
+        # 가장 아래쪽 y 기준으로 ±80px 범위 = 탭바 행
+        max_y = max(e.location['y'] for e in all_clickable)
+        tab_buttons = sorted(
+            [e for e in all_clickable if abs(e.location['y'] - max_y) <= 80],
+            key=lambda e: e.location['x']
+        )
+
+        # 5개 탭 중 2번째(내역) 클릭
+        if len(tab_buttons) >= 2:
+            tab_buttons[1].click()
+            self.wait_text('거래 내역', timeout=8)
+            return
+
+        raise TimeoutError(
+            f'내역 탭 이동 실패 — 탭바 후보 요소 {len(tab_buttons)}개 발견 '
+            f'(최하단 y={max_y})'
+        )
 
     @allure.step('금액 "{amount}" 항목 존재 여부 반환')
     def has_amount(self, amount: str) -> bool:

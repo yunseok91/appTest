@@ -179,7 +179,7 @@ export default function HomeScreen() {
               </View>
               <Text style={styles.coupleName} allowFontScaling={false}>{householdName}</Text>
             </View>
-            <TouchableOpacity onPress={() => setShowNotifications(true)} activeOpacity={0.7} style={{ position: 'relative' }}>
+            <TouchableOpacity testID="home-btn-notifications" onPress={() => setShowNotifications(true)} activeOpacity={0.7} style={{ position: 'relative' }}>
               <Ionicons name="notifications-outline" size={22} color={colors.text} />
               {unreadCount > 0 && (
                 <View style={styles.notiiBadge}>
@@ -225,7 +225,7 @@ export default function HomeScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={styles.balLbl}>이번 달 잔액</Text>
               <View>
-                <TouchableOpacity onPress={() => setShowBalTooltip(v => !v)} hitSlop={8}>
+                <TouchableOpacity testID="home-btn-balance-info" onPress={() => setShowBalTooltip(v => !v)} hitSlop={8}>
                   <Ionicons name="information-circle-outline" size={14} color={colors.textSecondary} />
                 </TouchableOpacity>
                 <Modal
@@ -341,6 +341,7 @@ export default function HomeScreen() {
             {/* 카드 선택 */}
             {payMethod === 'card' && (
               <TouchableOpacity
+                testID="home-btn-card-selector"
                 style={styles.cardSelector}
                 onPress={() => setShowCardPicker(true)}
                 activeOpacity={0.8}
@@ -401,6 +402,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
+                testID="home-btn-date"
                 style={[styles.fieldBtn, { flex: 1 }]}
                 onPress={() => setShowDatePicker(true)}
                 activeOpacity={0.8}
@@ -433,7 +435,7 @@ export default function HomeScreen() {
 
             {/* 액션 버튼 */}
             <View style={styles.actionRow}>
-              <TouchableOpacity style={styles.photoBtn} onPress={handlePickPhoto} activeOpacity={0.8}>
+              <TouchableOpacity testID="home-btn-photo" style={styles.photoBtn} onPress={handlePickPhoto} activeOpacity={0.8}>
                 {photoUri ? (
                   <Image source={{ uri: photoUri }} style={styles.photoThumb} />
                 ) : (
@@ -502,7 +504,7 @@ export default function HomeScreen() {
             <Text style={styles.welcomeSub}>
               {myName ? `${myName}의 첫 번째 날이에요\n` : ''}함께 기록을 시작해볼까요? 💑
             </Text>
-            <TouchableOpacity style={styles.welcomeBtn} onPress={handleCloseWelcome} activeOpacity={0.85}>
+            <TouchableOpacity testID="home-btn-welcome-start" style={styles.welcomeBtn} onPress={handleCloseWelcome} activeOpacity={0.85}>
               <Text style={styles.welcomeBtnText}>시작하기</Text>
             </TouchableOpacity>
           </View>
@@ -557,6 +559,7 @@ export default function HomeScreen() {
             cards.map((card) => (
               <TouchableOpacity
                 key={card.id}
+                testID={`home-btn-card-${card.id}`}
                 style={[styles.cardPickerItem, selectedCard?.id === card.id && styles.cardPickerItemActive]}
                 onPress={() => { setSelectedCard(card); setShowCardPicker(false); }}
                 activeOpacity={0.8}
@@ -584,7 +587,7 @@ export default function HomeScreen() {
           <View style={styles.notiiHeader}>
             <Text style={styles.notiiTitle}>알림</Text>
             {unreadCount > 0 && (
-              <TouchableOpacity onPress={() => user && markAllNotificationsReadFS(user.id).catch(() => {})} activeOpacity={0.7}>
+              <TouchableOpacity testID="home-btn-notif-read-all" onPress={() => user && markAllNotificationsReadFS(user.id).catch(() => {})} activeOpacity={0.7}>
                 <Text style={styles.notiiReadAll}>모두 읽음</Text>
               </TouchableOpacity>
             )}
@@ -599,6 +602,7 @@ export default function HomeScreen() {
               {notifications.map((n) => (
                 <TouchableOpacity
                   key={n.id}
+                  testID={`home-btn-notif-${n.id}`}
                   style={[styles.notiiItem, !n.read && styles.notiiItemUnread]}
                   activeOpacity={0.7}
                   onPress={() => user && !n.read && markNotificationReadFS(user.id, n.id).catch(() => {})}
@@ -627,11 +631,11 @@ export default function HomeScreen() {
         <View style={[styles.dateSheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.dateHeader}>
-            <TouchableOpacity style={styles.dateNavBtn} onPress={() => setPickerDate(new Date(pickerYear, pickerMonth - 1, 1))}>
+            <TouchableOpacity testID="home-btn-date-prev" style={styles.dateNavBtn} onPress={() => setPickerDate(new Date(pickerYear, pickerMonth - 1, 1))}>
               <Ionicons name="chevron-back" size={18} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.dateTitle}>{pickerYear}년 {pickerMonth + 1}월</Text>
-            <TouchableOpacity style={styles.dateNavBtn} onPress={() => setPickerDate(new Date(pickerYear, pickerMonth + 1, 1))}>
+            <TouchableOpacity testID="home-btn-date-next" style={styles.dateNavBtn} onPress={() => setPickerDate(new Date(pickerYear, pickerMonth + 1, 1))}>
               <Ionicons name="chevron-forward" size={18} color={colors.text} />
             </TouchableOpacity>
           </View>
@@ -651,6 +655,7 @@ export default function HomeScreen() {
               return (
                 <TouchableOpacity
                   key={`d-${day}`}
+                  testID={`home-btn-date-day-${day}`}
                   style={styles.calCell}
                   onPress={() => { setSelectedDate(new Date(pickerYear, pickerMonth, day)); setShowDatePicker(false); }}
                   activeOpacity={0.7}

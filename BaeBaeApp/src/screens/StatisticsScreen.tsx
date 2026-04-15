@@ -157,14 +157,14 @@ export default function StatisticsScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle} allowFontScaling={false}>통계</Text>
           <View style={styles.monthToggle}>
-            <TouchableOpacity onPress={() => setCurrentMonth(m => m > 1 ? m - 1 : 12)} activeOpacity={0.7}>
+            <TouchableOpacity testID="stats-btn-month-prev" onPress={() => setCurrentMonth(m => m > 1 ? m - 1 : 12)} activeOpacity={0.7}>
               <Ionicons name="chevron-back" size={18} color={colors.text} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.monthBtn} onPress={openPicker} activeOpacity={0.7}>
+            <TouchableOpacity testID="stats-btn-month-select" style={styles.monthBtn} onPress={openPicker} activeOpacity={0.7}>
               <Text style={styles.headerMonth}>{currentYear}년 {currentMonth}월</Text>
               <Ionicons name="chevron-down" size={14} color={colors.text} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setCurrentMonth(m => m < 12 ? m + 1 : 1)} activeOpacity={0.7}>
+            <TouchableOpacity testID="stats-btn-month-next" onPress={() => setCurrentMonth(m => m < 12 ? m + 1 : 1)} activeOpacity={0.7}>
               <Ionicons name="chevron-forward" size={18} color={colors.text} />
             </TouchableOpacity>
           </View>
@@ -175,6 +175,7 @@ export default function StatisticsScreen() {
           {([{ key: 'all' as const, label: '전체' }, { key: 'me' as const, label: myName }, { key: 'partner' as const, label: partnerName || '파트너' }]).map(({ key, label }) => (
             <TouchableOpacity
               key={key}
+              testID={`stats-btn-person-${key}`}
               style={[styles.personBtn, person === key && styles.personBtnActive]}
               onPress={() => setPerson(key)}
               activeOpacity={0.8}
@@ -191,6 +192,7 @@ export default function StatisticsScreen() {
             {(['donut', 'bar'] as const).map(type => (
               <TouchableOpacity
                 key={type}
+                testID={`stats-btn-chart-${type}`}
                 style={[styles.chartToggleBtn, chartType === type && styles.chartToggleBtnActive]}
                 onPress={() => setChartType(type)}
                 activeOpacity={0.8}
@@ -240,7 +242,7 @@ export default function StatisticsScreen() {
           <View style={styles.sheetHandle} />
           <View style={styles.ymHeader}>
             <Text style={styles.ymTitle}>날짜 선택</Text>
-            <TouchableOpacity onPress={() => setShowPicker(false)}>
+            <TouchableOpacity testID="stats-btn-picker-close" onPress={() => setShowPicker(false)}>
               <Ionicons name="close" size={18} color={colors.text} />
             </TouchableOpacity>
           </View>
@@ -260,7 +262,7 @@ export default function StatisticsScreen() {
             />
           </View>
 
-          <TouchableOpacity style={styles.ymConfirmBtn} onPress={confirmPicker} activeOpacity={0.85}>
+          <TouchableOpacity testID="stats-btn-picker-confirm" style={styles.ymConfirmBtn} onPress={confirmPicker} activeOpacity={0.85}>
             <Text style={styles.ymConfirmText}>확인</Text>
           </TouchableOpacity>
           </View>

@@ -33,7 +33,7 @@ function getDateLabel(dateStr: string): string {
 
 function TxRow({ tx, onPress }: { tx: Transaction; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.txRow} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity testID={`history-btn-tx-${tx.id}`} style={styles.txRow} onPress={onPress} activeOpacity={0.75}>
       <View style={[styles.txIconWrap, { backgroundColor: tx.categoryBgColor }]}>
         <Ionicons name={tx.categoryIcon as any} size={18} color={tx.categoryIconColor} />
       </View>
@@ -142,6 +142,7 @@ export default function HistoryScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle} allowFontScaling={false}>거래 내역</Text>
         <TouchableOpacity
+          testID="history-btn-filter"
           style={[styles.iconBtn, isFilterActive && styles.iconBtnActive]}
           onPress={() => setShowFilterSheet(true)}
           activeOpacity={0.8}
@@ -156,6 +157,7 @@ export default function HistoryScreen() {
         {(['전체', '지출', '수입'] as const).map((f) => (
           <TouchableOpacity
             key={f}
+            testID={`history-btn-type-${f}`}
             style={[styles.chip, activeFilter === f && styles.chipActive]}
             onPress={() => setActiveFilter(f)}
             activeOpacity={0.8}
@@ -167,10 +169,11 @@ export default function HistoryScreen() {
 
       {/* Month nav */}
       <View style={styles.monthNav}>
-        <TouchableOpacity style={styles.navBtn} onPress={() => setMonth(m => m > 1 ? m - 1 : 12)} activeOpacity={0.8}>
+        <TouchableOpacity testID="history-btn-month-prev" style={styles.navBtn} onPress={() => setMonth(m => m > 1 ? m - 1 : 12)} activeOpacity={0.8}>
           <Ionicons name="chevron-back" size={18} color={colors.text} />
         </TouchableOpacity>
         <TouchableOpacity
+          testID="history-btn-month-select"
           style={styles.monthBtn}
           onPress={() => {
             setPickYearIdx(YEARS.indexOf(year));
@@ -182,7 +185,7 @@ export default function HistoryScreen() {
           <Text style={styles.monthLabel}>{year}년 {month}월</Text>
           <Ionicons name="chevron-down" size={14} color={colors.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navBtn} onPress={() => setMonth(m => m < 12 ? m + 1 : 1)} activeOpacity={0.8}>
+        <TouchableOpacity testID="history-btn-month-next" style={styles.navBtn} onPress={() => setMonth(m => m < 12 ? m + 1 : 1)} activeOpacity={0.8}>
           <Ionicons name="chevron-forward" size={18} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -248,7 +251,7 @@ export default function HistoryScreen() {
                   <Ionicons name={selectedTx.categoryIcon as any} size={14} color={selectedTx.categoryIconColor} />
                   <Text style={[styles.catChipText, { color: selectedTx.categoryIconColor }]}>{selectedTx.category}</Text>
                 </View>
-                <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setSelectedTx(null)}>
+                <TouchableOpacity testID="history-btn-detail-close" style={styles.sheetCloseBtn} onPress={() => setSelectedTx(null)}>
                   <Ionicons name="close" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -288,6 +291,7 @@ export default function HistoryScreen() {
                   <View style={styles.photoSec}>
                     <Text style={styles.memoLbl}>첨부 사진</Text>
                     <TouchableOpacity
+                      testID="history-btn-photo-expand"
                       onPress={() => {
                         const uri = selectedTx.photoUri!;
                         setSelectedTx(null);
@@ -362,6 +366,7 @@ export default function HistoryScreen() {
           <View style={styles.filterSheetHeader}>
             <Text style={styles.filterSheetTitle}>필터</Text>
             <TouchableOpacity
+              testID="history-btn-filter-reset"
               onPress={() => { setSortOrder('recent'); if (partnerName) setPersonFilter('전체'); setPayFilter('전체'); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
@@ -378,6 +383,7 @@ export default function HistoryScreen() {
             ] as const).map(({ key, label }) => (
               <TouchableOpacity
                 key={key}
+                testID={`history-btn-sort-${key}`}
                 style={[styles.filterChip, sortOrder === key && styles.filterChipActive]}
                 onPress={() => setSortOrder(key)}
                 activeOpacity={0.8}
@@ -394,6 +400,7 @@ export default function HistoryScreen() {
                 {(['전체', '나', '파트너'] as const).map((p) => (
                   <TouchableOpacity
                     key={p}
+                    testID={`history-btn-person-${p}`}
                     style={[styles.filterChip, personFilter === p && styles.filterChipActive]}
                     onPress={() => setPersonFilter(p)}
                     activeOpacity={0.8}
@@ -410,6 +417,7 @@ export default function HistoryScreen() {
             {(['전체', '현금', '카드'] as const).map((p) => (
               <TouchableOpacity
                 key={p}
+                testID={`history-btn-pay-${p}`}
                 style={[styles.filterChip, payFilter === p && styles.filterChipActive]}
                 onPress={() => setPayFilter(p)}
                 activeOpacity={0.8}
@@ -419,7 +427,7 @@ export default function HistoryScreen() {
             ))}
           </View>
 
-          <TouchableOpacity style={styles.filterConfirmBtn} onPress={() => setShowFilterSheet(false)} activeOpacity={0.85}>
+          <TouchableOpacity testID="history-btn-filter-confirm" style={styles.filterConfirmBtn} onPress={() => setShowFilterSheet(false)} activeOpacity={0.85}>
             <Text style={styles.filterConfirmText}>적용</Text>
           </TouchableOpacity>
         </View>
@@ -445,7 +453,7 @@ export default function HistoryScreen() {
             <View style={styles.sheetHandle} />
             <View style={styles.ymHeader}>
               <Text style={styles.ymTitle}>날짜 선택</Text>
-              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+              <TouchableOpacity testID="history-btn-datepicker-close" onPress={() => setShowDatePicker(false)}>
                 <Ionicons name="close" size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
@@ -464,6 +472,7 @@ export default function HistoryScreen() {
               />
             </View>
             <TouchableOpacity
+              testID="history-btn-datepicker-confirm"
               style={styles.ymConfirmBtn}
               onPress={() => {
                 setYear(YEARS[pickYearIdx]);

@@ -85,13 +85,42 @@ export default function MyPageScreen() {
     setExporting(true);
     try {
       const csv = buildCSV(transactions, exportYear);
-      const path = `${FileSystem.cacheDirectory}baebae_${exportYear}.csv`;
-      await FileSystem.writeAsStringAsync(path, csv, { encoding: FileSystem.EncodingType.UTF8 });
-      await Sharing.shareAsync(path, {
-        mimeType: 'text/csv',
-        dialogTitle: `BaeBae ${exportYear}년 거래내역`,
-        UTI: 'public.comma-separated-values-text',
-      });
+      const fileName = `baebae_${exportYear}.csv`;
+
+      // TextEncoder로 JS 문자열 → UTF-8 바이트 변환 후 base64로 파일 쓰기
+      // (writeAsStringAsync의 플랫폼별 인코딩 불일치 문제 회피)
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(csv);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+
+      if (Platform.OS === 'android') {
+        // Android: 다운로드 폴더에 직접 저장
+        const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permissions.granted) {
+          setExporting(false);
+          return;
+        }
+        const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          fileName,
+          'text/csv',
+        );
+        await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+        Alert.alert('저장 완료', `${fileName} 파일이 선택한 폴더에 저장되었습니다.`);
+      } else {
+        // iOS: 공유 시트
+        const path = `${FileSystem.cacheDirectory}${fileName}`;
+        await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+        await Sharing.shareAsync(path, {
+          mimeType: 'text/csv',
+          dialogTitle: `BaeBae ${exportYear}년 거래내역`,
+          UTI: 'public.comma-separated-values-text',
+        });
+      }
       setShowExport(false);
     } catch (e: any) {
       Alert.alert('오류', e?.message ?? '내보내기 중 오류가 발생했습니다.');

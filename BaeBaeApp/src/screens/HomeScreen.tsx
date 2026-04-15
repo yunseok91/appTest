@@ -281,6 +281,7 @@ export default function HomeScreen() {
               return (
                 <TouchableOpacity
                   key={item.key}
+                  testID={`btn-time-${item.key}`}
                   style={[styles.timeBtn, active && styles.timeBtnActive]}
                   onPress={() => setTimeSlot(item.key)}
                   activeOpacity={0.8}
@@ -298,6 +299,7 @@ export default function HomeScreen() {
             {/* 지출 / 수입 토글 */}
             <View style={styles.typeToggle}>
               <TouchableOpacity
+                testID="btn-type-expense"
                 style={[styles.typeTab, tab === 'expense' && styles.typeTabExpense]}
                 onPress={() => { setTab('expense'); setSelectedCategory(null); }}
                 activeOpacity={0.8}
@@ -305,6 +307,7 @@ export default function HomeScreen() {
                 <Text style={[styles.typeTabText, tab === 'expense' && styles.typeTabTextActive]}>지출</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="btn-type-income"
                 style={[styles.typeTab, tab === 'income' && styles.typeTabIncome]}
                 onPress={() => { setTab('income'); setSelectedCategory(null); }}
                 activeOpacity={0.8}
@@ -316,6 +319,7 @@ export default function HomeScreen() {
             {/* 결제수단 */}
             <View style={styles.payMethodRow}>
               <TouchableOpacity
+                testID="btn-pay-cash"
                 style={[styles.payMethodBtn, payMethod === 'cash' && styles.payMethodBtnActive]}
                 onPress={() => setPayMethod('cash')}
                 activeOpacity={0.8}
@@ -324,6 +328,7 @@ export default function HomeScreen() {
                 <Text style={[styles.payMethodText, payMethod === 'cash' && styles.payMethodTextActive]}>현금</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="btn-pay-card"
                 style={[styles.payMethodBtn, payMethod === 'card' && styles.payMethodBtnActive]}
                 onPress={() => setPayMethod('card')}
                 activeOpacity={0.8}
@@ -358,6 +363,7 @@ export default function HomeScreen() {
               <View style={styles.amountInputRow}>
                 <Text style={[styles.amountPrefix, !amount && { color: colors.inactive }]}>₩</Text>
                 <TextInput
+                  testID="input-amount"
                   style={styles.amountInput}
                   value={amount ? Number(amount).toLocaleString('ko-KR') : ''}
                   onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
@@ -374,6 +380,7 @@ export default function HomeScreen() {
             {/* 카테고리 & 날짜 */}
             <View style={styles.fieldRow}>
               <TouchableOpacity
+                testID="btn-category"
                 style={[styles.fieldBtn, { flex: 1 }, selectedCategory && styles.fieldBtnSelected]}
                 onPress={() => setShowCategoryPicker(true)}
                 activeOpacity={0.8}
@@ -407,6 +414,7 @@ export default function HomeScreen() {
             <View style={styles.memoField}>
               <Ionicons name="chatbubble-outline" size={14} color={colors.inactive} style={{ marginTop: 2 }} />
               <TextInput
+                testID="input-memo"
                 style={styles.memoInput}
                 value={memo}
                 onChangeText={setMemo}
@@ -436,6 +444,7 @@ export default function HomeScreen() {
                 )}
               </TouchableOpacity>
               <TouchableOpacity
+                testID="btn-save"
                 style={[styles.saveBtn, (!amount || !selectedCategory) && { opacity: 0.4 }]}
                 activeOpacity={0.85}
                 disabled={!amount || !selectedCategory}
@@ -513,6 +522,7 @@ export default function HomeScreen() {
             scrollEnabled={false}
             renderItem={({ item }) => (
               <TouchableOpacity
+                testID={`btn-cat-${item.key}`}
                 style={styles.catItem}
                 onPress={() => { setSelectedCategory(item); setShowCategoryPicker(false); }}
                 activeOpacity={0.8}

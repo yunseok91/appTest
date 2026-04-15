@@ -1,2 +1,13 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# 모든 텍스트 파일 LF로 통일 (Windows CRLF 변환 방지)
+* text=auto eol=lf
+
+# 바이너리 파일은 변환 제외
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary

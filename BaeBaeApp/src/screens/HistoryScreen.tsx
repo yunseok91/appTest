@@ -319,6 +319,7 @@ export default function HistoryScreen() {
                 {selectedTx.person === myName ? (
                   <View style={styles.actionRow}>
                     <TouchableOpacity
+                      testID="btn-edit-tx"
                       style={styles.editBtn}
                       activeOpacity={0.8}
                       onPress={() => {
@@ -329,6 +330,7 @@ export default function HistoryScreen() {
                       <Text style={styles.editBtnText}>수정</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
+                      testID="btn-delete-tx"
                       style={styles.delBtn}
                       activeOpacity={0.8}
                       onPress={() => Alert.alert('삭제', '이 내역을 삭제할까요?', [

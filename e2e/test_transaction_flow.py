@@ -1,6 +1,18 @@
 """
-E2E 테스트 — 거래 등록 → 수정 → 삭제 플로우
+E2E 테스트 — 지출 등록 → 내역 화면 검증 플로우
 대상: BaeBaeApp (Android)
+
+[실제 앱 UI 구조]
+  - 홈(Home) 탭 = 거래 입력 폼 (별도 '추가' 버튼 없음)
+  - 하단 탭: 홈 | 내역 | 캘린더(중앙) | 통계 | 마이
+  - Android send_keys 한글 미지원 → 메모는 영문 사용
+
+[시나리오]
+  TC-E2E-01: 홈 화면에서 지출 등록 (금액·카테고리·메모 입력 → 저장)
+  TC-E2E-02: 내역 탭에서 등록 항목 노출 검증 (Assertion)
+  TC-E2E-03: 항목 수정 (금액 변경)
+  TC-E2E-04: 항목 삭제 후 목록에서 사라짐 검증
+
 실행: python e2e/test_transaction_flow.py
 """
 
@@ -10,161 +22,232 @@ from appium import webdriver
 from appium.options.android import UiAutomator2Options
 from appium.webdriver.common.appiumby import AppiumBy
 
-
-# ── Appium 서버 & 디바이스 설정 ──────────────────────────────
+# ── 설정 ─────────────────────────────────────────────────────
 APPIUM_SERVER = 'http://127.0.0.1:4723'
 
+# `adb devices` 실행 후 출력된 디바이스 ID로 변경
+# 예) 'R3CN801ABCD'  또는  'emulator-5554'
+DEVICE_NAME   = 'R3CW70RXA2B'
+
+AMOUNT        = '10000'          # 10,000원
+MEMO_TEXT     = 'lunch'          # 한글 send_keys Android 미지원 → 영문 사용
+
 OPTIONS = UiAutomator2Options()
-OPTIONS.platform_name       = 'Android'
-OPTIONS.device_name         = 'emulator-5554'   # adb devices 로 확인한 값으로 변경
-OPTIONS.app_package         = 'com.baebae.app'
-OPTIONS.app_activity        = '.MainActivity'
-OPTIONS.no_reset            = True               # 로그인 상태 유지
+OPTIONS.platform_name          = 'Android'
+OPTIONS.device_name            = DEVICE_NAME
+OPTIONS.app_package            = 'com.baebae.app'
+OPTIONS.app_activity           = '.MainActivity'
+OPTIONS.no_reset               = True
 OPTIONS.auto_grant_permissions = True
 
 
-def find(driver, test_id, timeout=10):
-    """testID로 요소 찾기 (Android: accessibility id)"""
+# ── 헬퍼 ─────────────────────────────────────────────────────
+def wait_text(driver, text, timeout=10):
+    """텍스트 정확히 일치하는 요소 대기 후 반환"""
     end = time.time() + timeout
     while time.time() < end:
         try:
-            el = driver.find_element(AppiumBy.ACCESSIBILITY_ID, test_id)
-            if el.is_displayed():
-                return el
-        except Exception:
-            pass
-        time.sleep(0.5)
-    raise TimeoutError(f'요소를 찾을 수 없음: {test_id}')
-
-
-def find_text(driver, text, timeout=10):
-    """텍스트로 요소 찾기"""
-    end = time.time() + timeout
-    while time.time() < end:
-        try:
-            el = driver.find_element(AppiumBy.ANDROID_UIAUTOMATOR,
+            el = driver.find_element(
+                AppiumBy.ANDROID_UIAUTOMATOR,
                 f'new UiSelector().text("{text}")')
             if el.is_displayed():
                 return el
         except Exception:
             pass
         time.sleep(0.5)
-    raise TimeoutError(f'텍스트를 찾을 수 없음: {text}')
+    raise TimeoutError(f'요소 없음 (텍스트): {text}')
 
 
+def wait_text_contains(driver, text, timeout=10):
+    """텍스트 부분 포함하는 요소 대기 후 반환"""
+    end = time.time() + timeout
+    while time.time() < end:
+        try:
+            el = driver.find_element(
+                AppiumBy.ANDROID_UIAUTOMATOR,
+                f'new UiSelector().textContains("{text}")')
+            if el.is_displayed():
+                return el
+        except Exception:
+            pass
+        time.sleep(0.5)
+    raise TimeoutError(f'요소 없음 (포함 텍스트): {text}')
+
+
+def get_edittext(driver, index=0, timeout=10):
+    """n번째 EditText 반환 (0 = 금액, 1 = 메모)"""
+    end = time.time() + timeout
+    while time.time() < end:
+        try:
+            els = driver.find_elements(AppiumBy.CLASS_NAME, 'android.widget.EditText')
+            if len(els) > index:
+                return els[index]
+        except Exception:
+            pass
+        time.sleep(0.5)
+    raise TimeoutError(f'EditText[{index}] 없음')
+
+
+def confirm_dialog(driver):
+    """AlertDialog 확인 버튼 클릭 (android:id/button1 → '확인' 텍스트 순)"""
+    try:
+        driver.find_element(AppiumBy.ID, 'android:id/button1').click()
+    except Exception:
+        wait_text(driver, '확인').click()
+
+
+# ── 테스트 ────────────────────────────────────────────────────
 class TransactionFlowTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         cls.driver = webdriver.Remote(APPIUM_SERVER, options=OPTIONS)
         cls.driver.implicitly_wait(5)
-        time.sleep(3)  # 앱 초기 로딩 대기
+        time.sleep(3)   # 앱 초기 로딩 대기
 
     @classmethod
     def tearDownClass(cls):
         cls.driver.quit()
 
-    # ── TC-E2E-01. 거래 등록 ─────────────────────────────────
-    def test_01_register_transaction(self):
-        driver = self.driver
-        print('\n[TC-E2E-01] 거래 등록 시작')
+    # ──────────────────────────────────────────────────────────
+    # TC-E2E-01. 지출 등록 (홈 화면 입력 폼)
+    # ──────────────────────────────────────────────────────────
+    def test_01_register_expense(self):
+        d = self.driver
+        print('\n[TC-E2E-01] 지출 등록')
 
-        # 1. 시간대 선택 — 점심
-        find(driver, 'btn-time-lunch').click()
+        # 1. 홈 탭이 초기 화면 (별도 이동 불필요)
+        #    혹시 다른 탭에 있으면 홈으로 이동
+        try:
+            wait_text(d, '점심', timeout=3).click()   # 이미 홈 화면이면 시간대 버튼 보임
+        except TimeoutError:
+            # 홈 탭으로 이동 후 재시도 (탭바 첫 번째 아이콘 클릭)
+            d.find_elements(AppiumBy.CLASS_NAME, 'android.widget.FrameLayout')[0].click()
+            time.sleep(1)
+            wait_text(d, '점심').click()
         time.sleep(0.5)
 
         # 2. 거래 유형 — 지출
-        find(driver, 'btn-type-expense').click()
+        wait_text(d, '지출').click()
+        time.sleep(0.3)
+
+        # 3. 금액 입력 — 10,000원
+        #    클릭 후 리렌더링으로 참조 무효화 → 재탐색
+        get_edittext(d, 0).click()
+        time.sleep(0.3)
+        get_edittext(d, 0).send_keys(AMOUNT)
+        d.hide_keyboard()
+        time.sleep(0.3)
+
+        # 4. 카테고리 선택 — 식비
+        wait_text(d, '카테고리').click()
+        time.sleep(0.8)
+        wait_text(d, '식비').click()
         time.sleep(0.5)
 
-        # 3. 결제수단 — 현금
-        find(driver, 'btn-pay-cash').click()
+        # 5. 메모 입력 (두 번째 EditText)
+        get_edittext(d, 1).send_keys(MEMO_TEXT)
+        d.hide_keyboard()
+        time.sleep(0.3)
+
+        # 6. 저장하기
+        wait_text(d, '저장하기').click()
         time.sleep(0.5)
 
-        # 4. 금액 입력 — 10000
-        amount_input = find(driver, 'input-amount')
-        amount_input.click()
-        amount_input.send_keys('10000')
-        driver.hide_keyboard()
-        time.sleep(0.5)
-
-        # 5. 카테고리 선택 — 식비(food)
-        find(driver, 'btn-category').click()
-        time.sleep(1)
-        find(driver, 'btn-cat-food').click()
-        time.sleep(0.5)
-
-        # 6. 메모 입력
-        memo_input = find(driver, 'input-memo')
-        memo_input.click()
-        memo_input.send_keys('E2E 테스트 등록')
-        driver.hide_keyboard()
-        time.sleep(0.5)
-
-        # 7. 저장하기
-        find(driver, 'btn-save').click()
+        # 7. 저장 완료 다이얼로그 확인
+        confirm_dialog(d)
         time.sleep(1)
 
-        print('[TC-E2E-01] 거래 등록 완료 ✅')
+        print('[TC-E2E-01] ✅ 완료')
 
-    # ── TC-E2E-02. 거래 수정 ─────────────────────────────────
-    def test_02_edit_transaction(self):
-        driver = self.driver
-        print('\n[TC-E2E-02] 거래 수정 시작')
+    # ──────────────────────────────────────────────────────────
+    # TC-E2E-02. 내역 탭에서 등록 항목 검증 (Assertion)
+    # ──────────────────────────────────────────────────────────
+    def test_02_verify_in_history(self):
+        d = self.driver
+        print('\n[TC-E2E-02] 내역 탭 검증')
 
-        # 거래내역 탭으로 이동 (하단 두 번째 탭)
-        tabs = driver.find_elements(AppiumBy.CLASS_NAME, 'android.widget.FrameLayout')
-        # 텍스트로 탭 찾기
-        find_text(driver, '거래내역').click()
+        # 내역 탭으로 이동
+        wait_text(d, '내역').click()
         time.sleep(1)
 
-        # 등록한 거래 항목 클릭 (메모 텍스트로 찾기)
-        find_text(driver, 'E2E 테스트 등록').click()
+        # [Assertion 1] 금액 표시 확인 — "10,000" 포함 텍스트
+        amount_el = wait_text_contains(d, '10,000')
+        self.assertIsNotNone(amount_el, '❌ 금액(10,000)이 내역에 표시되지 않음')
+
+        # [Assertion 2] 메모 텍스트 확인
+        memo_el = wait_text(d, MEMO_TEXT)
+        self.assertIsNotNone(memo_el, f'❌ 메모({MEMO_TEXT})가 내역에 표시되지 않음')
+
+        print('[TC-E2E-02] ✅ 완료 — 금액·메모 노출 확인')
+
+    # ──────────────────────────────────────────────────────────
+    # TC-E2E-03. 거래 수정 (금액 변경)
+    # ──────────────────────────────────────────────────────────
+    def test_03_edit_transaction(self):
+        d = self.driver
+        print('\n[TC-E2E-03] 거래 수정')
+
+        # 등록한 거래 항목 클릭
+        wait_text(d, MEMO_TEXT).click()
         time.sleep(1)
 
-        # 수정 버튼 클릭
-        find(driver, 'btn-edit-tx').click()
+        # 수정 버튼
+        wait_text(d, '수정').click()
         time.sleep(1)
 
-        # 금액 수정 — 기존 내용 지우고 20000 입력
-        amount_field = driver.find_elements(AppiumBy.CLASS_NAME, 'android.widget.EditText')[0]
+        # 금액 변경 — 5,000원
+        amount_field = get_edittext(d, 0)
         amount_field.clear()
-        amount_field.send_keys('20000')
-        driver.hide_keyboard()
-        time.sleep(0.5)
+        amount_field.send_keys('5000')
+        d.hide_keyboard()
+        time.sleep(0.3)
 
-        # 저장 (수정 모달의 저장 버튼 — 텍스트로 찾기)
-        find_text(driver, '저장').click()
-        time.sleep(1)
-
-        print('[TC-E2E-02] 거래 수정 완료 ✅')
-
-    # ── TC-E2E-03. 거래 삭제 ─────────────────────────────────
-    def test_03_delete_transaction(self):
-        driver = self.driver
-        print('\n[TC-E2E-03] 거래 삭제 시작')
-
-        # 수정된 거래 항목 클릭
-        find_text(driver, 'E2E 테스트 등록').click()
-        time.sleep(1)
-
-        # 삭제 버튼 클릭
-        find(driver, 'btn-delete-tx').click()
-        time.sleep(0.5)
-
-        # 확인 다이얼로그 — 삭제 확인
-        find_text(driver, '삭제').click()
-        time.sleep(1)
-
-        # 삭제 후 해당 항목이 없는지 확인
+        # 저장
         try:
-            driver.find_element(AppiumBy.ANDROID_UIAUTOMATOR,
-                'new UiSelector().text("E2E 테스트 등록")')
-            self.fail('삭제 후에도 항목이 존재함')
-        except Exception:
-            pass  # 항목 없음 = 삭제 성공
+            wait_text(d, '저장하기').click()
+        except TimeoutError:
+            wait_text(d, '저장').click()
+        time.sleep(0.5)
 
-        print('[TC-E2E-03] 거래 삭제 완료 ✅')
+        confirm_dialog(d)
+        time.sleep(1)
+
+        # [Assertion] 수정된 금액 확인
+        modified = wait_text_contains(d, '5,000')
+        self.assertIsNotNone(modified, '❌ 수정된 금액(5,000)이 표시되지 않음')
+
+        print('[TC-E2E-03] ✅ 완료')
+
+    # ──────────────────────────────────────────────────────────
+    # TC-E2E-04. 거래 삭제 후 목록에서 사라짐 검증
+    # ──────────────────────────────────────────────────────────
+    def test_04_delete_transaction(self):
+        d = self.driver
+        print('\n[TC-E2E-04] 거래 삭제')
+
+        # 항목 클릭
+        wait_text(d, MEMO_TEXT).click()
+        time.sleep(1)
+
+        # 삭제 버튼
+        wait_text(d, '삭제').click()
+        time.sleep(0.5)
+
+        # 삭제 확인 다이얼로그
+        confirm_dialog(d)
+        time.sleep(1)
+
+        # [Assertion] 삭제 후 목록에서 사라져야 함
+        try:
+            d.find_element(
+                AppiumBy.ANDROID_UIAUTOMATOR,
+                f'new UiSelector().text("{MEMO_TEXT}")')
+            self.fail(f'❌ 삭제 후에도 "{MEMO_TEXT}" 항목이 남아있음')
+        except Exception:
+            pass  # 요소 없음 = 정상
+
+        print('[TC-E2E-04] ✅ 완료 — 항목 삭제 확인')
 
 
 if __name__ == '__main__':

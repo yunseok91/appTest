@@ -1,2 +1,9 @@
 # Pencil MCP auto-generated images
 images/
+
+# Allure 테스트 결과 (로컬 생성 파일)
+e2e/allure-results/
+
+# Python 캐시
+e2e/**/__pycache__/
+e2e/**/*.pyc

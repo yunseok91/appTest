@@ -74,7 +74,8 @@ function CustomTabBar({ state, navigation }: any) {
         }
 
         return (
-          <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabBtn} activeOpacity={0.7}>
+          <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabBtn} activeOpacity={0.7}
+            accessibilityLabel={item?.label}>
             <Ionicons
               name={(isFocused ? item?.icon : `${item?.icon}-outline`) as any}
               size={22}

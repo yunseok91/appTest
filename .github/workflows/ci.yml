@@ -29,7 +29,7 @@ jobs:
 
       # 3. node_modules 설치 (npm ci = CI 전용, package-lock.json 기준으로 정확히 설치)
       - name: 의존성 설치
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: BaeBaeApp
 
       # 4. TypeScript 타입 오류 검사 (빌드 없이 타입만 체크 — --noEmit)

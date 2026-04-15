@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: BaeBaeApp
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: 타입 검사 (TypeScript)
         working-directory: BaeBaeApp
@@ -53,7 +53,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: BaeBaeApp
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: EAS Update
         working-directory: BaeBaeApp

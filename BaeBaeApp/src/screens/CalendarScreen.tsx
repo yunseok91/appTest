@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
-  Modal, ScrollView, Alert, Keyboard, Platform, Image,
+  Modal, Keyboard, Platform,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,11 +12,10 @@ import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../context/ProfileContext';
 import PhotoViewerModal from '../components/PhotoViewerModal';
 import WheelPicker, { YEARS, MONTHS, ITEM_H } from '../components/WheelPicker';
-import TxCommentSection from '../components/TxCommentSection';
 import EditTxModal from '../components/EditTxModal';
+import TxDetailPopup from '../components/TxDetailPopup';
 
 type PersonFilter = 'all' | 'me' | 'partner';
-
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 function formatW(amount: number) {
@@ -263,141 +262,26 @@ export default function CalendarScreen() {
 
       {/* 거래 상세 팝업 */}
       <Modal visible={!!selectedTx} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setSelectedTx(null)}>
-        {/* 전체 화면 딤 배경 (nav bar 포함) */}
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
-        <View style={{
-          flex: 1,
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-        }}>
+        <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
           <View style={[styles.detailModalWrap, kbHeight > 0 && { justifyContent: 'flex-end', paddingBottom: kbHeight + 8 }]}>
             <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setSelectedTx(null)} />
-          {selectedTx && (() => {
-            const isMe = selectedTx.person === myName;
-            const personColor = isMe ? '#C4729A' : '#4A90D9';
-            const personBg = isMe ? '#FDF0F6' : '#EBF0FF';
-            return (
-              <View style={[styles.detailPopup, { height: effectivePopupH }]}>
-                  {/* 헤더: 카테고리 칩 + 닫기 */}
-                  <View style={styles.detailHeader}>
-                    <View style={[styles.catChip, { backgroundColor: selectedTx.categoryBgColor }]}>
-                      <Ionicons name={selectedTx.categoryIcon as any} size={14} color={selectedTx.categoryIconColor} />
-                      <Text style={[styles.catChipText, { color: selectedTx.categoryIconColor }]}>{selectedTx.category}</Text>
-                    </View>
-                    <TouchableOpacity testID="calendar-btn-detail-close" style={styles.closeBtn} onPress={() => setSelectedTx(null)}>
-                      <Ionicons name="close" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* 금액 */}
-                  <View style={styles.detailAmtSec}>
-                    <View style={styles.detailTypeRow}>
-                      <View style={styles.expenseTag}>
-                        <Text style={styles.expenseTagText}>지출</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.detailAmt} allowFontScaling={false}>₩{selectedTx.amount.toLocaleString()}</Text>
-                  </View>
-
-                  <View style={styles.detailDivider} />
-
-                  {/* 메모 */}
-                  <View style={styles.detailMemoRow}>
-                    <Ionicons name="chatbubble-outline" size={14} color={colors.inactive} style={{ marginTop: 2 }} />
-                    <ScrollView style={styles.detailMemoScroll} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                      <Text style={styles.detailMemoText}>{selectedTx.memo || '메모 없음'}</Text>
-                    </ScrollView>
-                  </View>
-
-                  {selectedTx.photoUri && (
-                    <>
-                      <View style={styles.detailDivider} />
-                      <TouchableOpacity
-                        testID="calendar-btn-photo-expand"
-                      onPress={() => {
-                          const uri = selectedTx.photoUri!;
-                          setSelectedTx(null);
-                          setViewPhotoUri(uri);
-                        }}
-                        activeOpacity={0.85}
-                      >
-                        <Image source={{ uri: selectedTx.photoUri }} style={styles.detailPhoto} resizeMode="cover" />
-                        <View style={styles.photoExpandBtn}>
-                          <Ionicons name="expand-outline" size={16} color="#fff" />
-                        </View>
-                      </TouchableOpacity>
-                    </>
-                  )}
-
-                  <View style={styles.detailDivider} />
-
-                  {/* 기록자 */}
-                  <View style={styles.detailRecorderRow}>
-                    <Text style={styles.detailRecorderLabel}>기록자</Text>
-                    <View style={[styles.recorderBadge, { backgroundColor: personBg }]}>
-                      <View style={[styles.dot, { backgroundColor: personColor }]} />
-                      <Text style={[styles.recorderName, { color: personColor }]}>{selectedTx.person}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.detailDivider} />
-
-                  {/* ── 댓글 + 버튼 ── */}
-                  <View style={{ flex: 1 }}>
-                    <TxCommentSection
-                      txId={selectedTx.id}
-                      householdId={householdId}
-                      userId={user?.id ?? ''}
-                      userName={myName}
-                      partnerUserId={partnerId ?? undefined}
-                    />
-
-                    <View style={styles.actionDivider} />
-                    {isMe ? (
-                      <View style={styles.detailActions}>
-                        <TouchableOpacity
-                          testID="calendar-btn-edit"
-                          style={styles.editBtn}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            const tx = selectedTx;
-                            setSelectedTx(null);
-                            setSelectedDay(null);
-                            setEditTx(tx);
-                          }}
-                        >
-                          <Ionicons name="pencil-outline" size={16} color={colors.text} />
-                          <Text style={styles.editBtnText}>수정</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          testID="calendar-btn-delete"
-                          style={styles.deleteBtn}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            Alert.alert('삭제', `"${selectedTx.memo}" 내역을 삭제할까요?`, [
-                              { text: '취소', style: 'cancel' },
-                              { text: '삭제', style: 'destructive', onPress: () => {
-                                deleteTransaction(selectedTx.id);
-                                setSelectedTx(null);
-                                setSelectedDay(null);
-                              }},
-                            ]);
-                          }}
-                        >
-                          <Ionicons name="trash-outline" size={16} color="#E05C5C" />
-                          <Text style={styles.deleteBtnText}>삭제</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <View style={styles.viewOnlyRow}>
-                        <Ionicons name="lock-closed-outline" size={14} color={colors.inactive} />
-                        <Text style={styles.viewOnlyText}>{selectedTx.person}이(가) 등록한 내역입니다</Text>
-                      </View>
-                    )}
-                  </View>
-              </View>
-            );
-          })()}
+            {selectedTx && (
+              <TxDetailPopup
+                tx={selectedTx}
+                myName={myName}
+                householdId={householdId}
+                userId={user?.id ?? ''}
+                partnerUserId={partnerId ?? undefined}
+                height={effectivePopupH}
+                kbHeight={kbHeight}
+                idPrefix="calendar"
+                onClose={() => setSelectedTx(null)}
+                onEdit={(tx) => { setSelectedTx(null); setSelectedDay(null); setEditTx(tx); }}
+                onDelete={(tx) => { deleteTransaction(tx.id); setSelectedTx(null); setSelectedDay(null); }}
+                onPhotoExpand={(uri) => { setSelectedTx(null); setViewPhotoUri(uri); }}
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -548,7 +432,7 @@ const styles = StyleSheet.create({
   // 거래 상세 팝업
   detailModalWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
   detailPopup: { width: '100%', backgroundColor: colors.card, borderRadius: 24, overflow: 'hidden', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
-  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 52 },
+  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 44 },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
   catChipText: { fontFamily: fonts.semiBold, fontSize: 13 },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
@@ -556,7 +440,24 @@ const styles = StyleSheet.create({
   detailTypeRow: { flexDirection: 'row' },
   expenseTag: { backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   expenseTagText: { fontFamily: fonts.medium, fontSize: 11, color: '#E05C5C' },
-  detailAmt: { fontFamily: fonts.bold, fontSize: 34, lineHeight: 42, color: colors.text, letterSpacing: -1 },
+  detailMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 4, flexWrap: 'wrap' },
+  metaDateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 },
+  detailPersonBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100 },
+  detailPersonText: { fontFamily: fonts.semiBold, fontSize: 12 },
+  detailPayBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100 },
+  detailPayText: { fontFamily: fonts.medium, fontSize: 12 },
+  detailDate: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+  detailDateSmall: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
+  dateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, flexWrap: 'wrap' },
+  dateTimeSep: { width: 1, height: 12, backgroundColor: colors.border, marginHorizontal: 2 },
+  detailTimeRow: { flexDirection: 'row', gap: 8, paddingVertical: 8 },
+  detailTimeChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, backgroundColor: colors.canvas },
+  detailTimeChipSm: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100, backgroundColor: colors.canvas },
+  detailTimeChipActive: { backgroundColor: colors.primary },
+  detailTimeText: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
+  detailTimeTextSm: { fontFamily: fonts.medium, fontSize: 11, color: colors.textSecondary },
+  detailTimeTextActive: { color: '#FFFFFF' },
+  detailAmt: { fontFamily: fonts.bold, fontSize: 28, lineHeight: 36, color: colors.text, letterSpacing: -0.5, marginBottom: 6 },
   detailDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 4, marginHorizontal: -20 },
   detailPhoto: { width: '100%', height: 120, borderRadius: 12, marginVertical: 4 },
   photoExpandBtn: {
@@ -565,9 +466,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center', justifyContent: 'center',
   },
+  calMidScroll: { maxHeight: 260, flexShrink: 1 },
   detailMemoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 14 },
-  detailMemoScroll: { flex: 1, maxHeight: 72 },
-  detailMemoText: { fontFamily: fonts.regular, fontSize: 14, color: colors.text, lineHeight: 22 },
+  detailMemoText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.text, lineHeight: 22 },
   detailRecorderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
   detailRecorderLabel: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
   recorderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100 },

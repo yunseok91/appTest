@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
-  ScrollView, Modal, Alert, Keyboard, Platform, Image,
+  ScrollView, Modal, Keyboard, Platform,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,12 +12,9 @@ import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../context/ProfileContext';
 import PhotoViewerModal from '../components/PhotoViewerModal';
 import WheelPicker, { YEARS, MONTHS, ITEM_H } from '../components/WheelPicker';
-import TxCommentSection from '../components/TxCommentSection';
 import EditTxModal from '../components/EditTxModal';
+import TxDetailPopup from '../components/TxDetailPopup';
 
-type TimeSlot = '아침' | '점심' | '저녁';
-const TIME_SLOTS: TimeSlot[] = ['아침', '점심', '저녁'];
-const TIME_EMOJI: Record<TimeSlot, string> = { 아침: '🌅', 점심: '☀️', 저녁: '🌙' };
 
 function getDateLabel(dateStr: string): string {
   const today = new Date();
@@ -233,127 +230,26 @@ export default function HistoryScreen() {
 
       {/* Transaction Detail Popup */}
       <Modal visible={!!selectedTx} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setSelectedTx(null)}>
-        {/* 전체 화면 딤 배경 (nav bar 포함) */}
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
-        <View style={{
-          flex: 1,
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-        }}>
+        <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
           <View style={[styles.sheetModalWrap, kbHeight > 0 && { justifyContent: 'flex-end', paddingBottom: kbHeight + 8 }]}>
             <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setSelectedTx(null)} />
-          {selectedTx && (
-            <View style={[styles.sheetPopup, { height: effectivePopupH }]}>
-
-              {/* ── 고정 헤더 영역 ── */}
-              <View style={styles.sheetTopRow}>
-                <View style={[styles.catChip, { backgroundColor: selectedTx.categoryBgColor }]}>
-                  <Ionicons name={selectedTx.categoryIcon as any} size={14} color={selectedTx.categoryIconColor} />
-                  <Text style={[styles.catChipText, { color: selectedTx.categoryIconColor }]}>{selectedTx.category}</Text>
-                </View>
-                <TouchableOpacity testID="history-btn-detail-close" style={styles.sheetCloseBtn} onPress={() => setSelectedTx(null)}>
-                  <Ionicons name="close" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.sheetMetaRow}>
-                <View style={[styles.personBadge, { backgroundColor: colors.primaryLighter }]}>
-                  <Text style={[styles.personBadgeText, { color: colors.primary }]}>{selectedTx.person}</Text>
-                </View>
-                <View style={[styles.payBadge, { backgroundColor: selectedTx.payMethod === 'cash' ? '#F0F4FF' : '#FFF0F6' }]}>
-                  <Text style={[styles.payBadgeText, { color: selectedTx.payMethod === 'cash' ? '#4A6CF7' : '#E05C9C' }]}>
-                    {selectedTx.payMethod === 'cash' ? '현금' : selectedTx.cardName ? selectedTx.cardName : '카드'}
-                  </Text>
-                </View>
-                <Text style={styles.sheetDate}>{getDateLabel(selectedTx.date)}</Text>
-              </View>
-              <Text style={[styles.sheetAmt, { color: selectedTx.type === 'income' ? colors.primary : colors.text }]} allowFontScaling={false}>
-                {selectedTx.type === 'income' ? '+' : '-'}₩{selectedTx.amount.toLocaleString()}
-              </Text>
-              <View style={styles.timeRow}>
-                {TIME_SLOTS.map((t) => (
-                  <View key={t} style={[styles.timeChip, selectedTx.time === t && styles.timeChipActive]}>
-                    <Text style={[styles.timeChipText, selectedTx.time === t && styles.timeChipTextActive]}>
-                      {TIME_EMOJI[t]} {t}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-              <View style={styles.sheetDivider} />
-              <View style={styles.memoSec}>
-                <Text style={styles.memoLbl}>메모</Text>
-                <ScrollView style={styles.memoScroll} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                  <Text style={styles.memoTxt}>{selectedTx.memo || '(메모 없음)'}</Text>
-                </ScrollView>
-              </View>
-              {selectedTx.photoUri && (
-                <>
-                  <View style={styles.sheetDivider} />
-                  <View style={styles.photoSec}>
-                    <Text style={styles.memoLbl}>첨부 사진</Text>
-                    <TouchableOpacity
-                      testID="history-btn-photo-expand"
-                      onPress={() => {
-                        const uri = selectedTx.photoUri!;
-                        setSelectedTx(null);
-                        setViewPhotoUri(uri);
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <Image source={{ uri: selectedTx.photoUri }} style={styles.txPhoto} resizeMode="cover" />
-                      <View style={styles.photoExpandBtn}>
-                        <Ionicons name="expand-outline" size={16} color="#fff" />
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-              <View style={styles.sheetDivider} />
-
-              {/* ── 댓글 + 버튼 ── */}
-              <View style={{ flex: 1 }}>
-                <TxCommentSection
-                  txId={selectedTx.id}
-                  householdId={householdId}
-                  userId={user?.id ?? ''}
-                  userName={myName}
-                  partnerUserId={partnerId ?? undefined}
-                />
-
-                <View style={styles.actionDivider} />
-                {selectedTx.person === myName ? (
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      testID="btn-edit-tx"
-                      style={styles.editBtn}
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        setEditTx(selectedTx);
-                        setSelectedTx(null);
-                      }}
-                    >
-                      <Text style={styles.editBtnText}>수정</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      testID="btn-delete-tx"
-                      style={styles.delBtn}
-                      activeOpacity={0.8}
-                      onPress={() => Alert.alert('삭제', '이 내역을 삭제할까요?', [
-                        { text: '취소', style: 'cancel' },
-                        { text: '삭제', style: 'destructive', onPress: () => { deleteTransaction(selectedTx.id); setSelectedTx(null); }},
-                      ])}
-                    >
-                      <Text style={styles.delBtnText}>삭제</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.viewOnlyRow}>
-                    <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
-                    <Text style={styles.viewOnlyText}>{selectedTx.person}이(가) 등록한 내역입니다</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
+            {selectedTx && (
+              <TxDetailPopup
+                tx={selectedTx}
+                myName={myName}
+                householdId={householdId}
+                userId={user?.id ?? ''}
+                partnerUserId={partnerId ?? undefined}
+                height={effectivePopupH}
+                kbHeight={kbHeight}
+                idPrefix="history"
+                onClose={() => setSelectedTx(null)}
+                onEdit={(tx) => { setEditTx(tx); setSelectedTx(null); }}
+                onDelete={(tx) => { deleteTransaction(tx.id); setSelectedTx(null); }}
+                onPhotoExpand={(uri) => { setSelectedTx(null); setViewPhotoUri(uri); }}
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -536,24 +432,30 @@ const styles = StyleSheet.create({
   sheetModalWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
   sheetPopup: { width: '100%', backgroundColor: colors.card, borderRadius: 24, overflow: 'hidden', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
-  sheetTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sheetTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 100 },
   catChipText: { fontFamily: fonts.semiBold, fontSize: 13 },
   sheetCloseBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
-  sheetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  sheetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  metaDateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 },
   personBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
   personBadgeText: { fontFamily: fonts.semiBold, fontSize: 11 },
   sheetDate: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
-  sheetAmt: { fontFamily: fonts.bold, fontSize: 34, lineHeight: 42, marginBottom: 14 },
+  sheetDateSmall: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
+  dateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, flexWrap: 'wrap' },
+  dateTimeSep: { width: 1, height: 12, backgroundColor: colors.border, marginHorizontal: 2 },
+  sheetAmt: { fontFamily: fonts.bold, fontSize: 28, lineHeight: 36, marginBottom: 6 },
   timeRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   timeChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, backgroundColor: colors.canvas },
+  timeChipSm: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100, backgroundColor: colors.canvas },
   timeChipActive: { backgroundColor: colors.primary },
   timeChipText: { fontFamily: fonts.medium, fontSize: 13, color: colors.text },
+  timeChipTextSm: { fontFamily: fonts.medium, fontSize: 11, color: colors.textSecondary },
   timeChipTextActive: { color: '#FFFFFF' },
   sheetDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginBottom: 12, marginHorizontal: -20 },
+  midScroll: { maxHeight: 220, flexShrink: 1 },
   memoSec: { gap: 4, marginBottom: 12 },
   memoLbl: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
-  memoScroll: { maxHeight: 72 },
   memoTxt: { fontFamily: fonts.regular, fontSize: 15, color: colors.text, lineHeight: 22 },
   photoSec: { gap: 8, marginBottom: 14 },
   txPhoto: { width: '100%', height: 120, borderRadius: 12 },

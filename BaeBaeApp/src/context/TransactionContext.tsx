@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 import {
@@ -30,6 +30,8 @@ export type Transaction = {
   photoUri?: string;
   createdBy?: string;  // userId — 소유권 분리용
   createdAt: string;   // ISO timestamp
+  recurring?: 'monthly' | 'weekly' | null;
+  recurringSourceId?: string;
 };
 
 type TransactionContextType = {
@@ -38,6 +40,7 @@ type TransactionContextType = {
   addTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => Promise<void>;
   updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
+  checkAndAddRecurring: () => Promise<number>;
 };
 
 const TransactionContext = createContext<TransactionContextType>({
@@ -46,6 +49,7 @@ const TransactionContext = createContext<TransactionContextType>({
   addTransaction: async () => {},
   updateTransaction: async () => {},
   deleteTransaction: async () => {},
+  checkAndAddRecurring: async () => 0,
 });
 
 const LOCAL_KEY = '@baebae_transactions';
@@ -181,6 +185,41 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  const RECURRING_LAST_RUN_KEY = '@baebae_recurring_last_run';
+
+  const checkAndAddRecurring = useCallback(async (): Promise<number> => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const lastRun = await AsyncStorage.getItem(RECURRING_LAST_RUN_KEY);
+    if (lastRun === todayStr) return 0;
+
+    const templates = transactions.filter(tx => tx.recurring);
+    let addedCount = 0;
+
+    for (const template of templates) {
+      const originalDate = new Date(template.date);
+      const isDue =
+        (template.recurring === 'monthly' && originalDate.getDate() === today.getDate()) ||
+        (template.recurring === 'weekly' && originalDate.getDay() === today.getDay());
+
+      if (!isDue) continue;
+      if (template.date === todayStr) continue;
+
+      const alreadyAdded = transactions.some(
+        tx => tx.recurringSourceId === template.id && tx.date === todayStr,
+      );
+      if (alreadyAdded) continue;
+
+      const { id: _id, createdAt: _ca, ...rest } = template;
+      await addTransaction({ ...rest, date: todayStr, recurring: null, recurringSourceId: template.id });
+      addedCount++;
+    }
+
+    await AsyncStorage.setItem(RECURRING_LAST_RUN_KEY, todayStr);
+    return addedCount;
+  }, [transactions]);
+
   const deleteTransaction = async (id: string) => {
     if (householdId) {
       try {
@@ -197,7 +236,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
   return (
     <TransactionContext.Provider value={{
       transactions, isFirestoreMode,
-      addTransaction, updateTransaction, deleteTransaction,
+      addTransaction, updateTransaction, deleteTransaction, checkAndAddRecurring,
     }}>
       {children}
     </TransactionContext.Provider>

@@ -81,8 +81,10 @@ export default function StatisticsScreen() {
   const insets = useSafeAreaInsets();
   const { transactions } = useTransactions();
   const { user, partnerName } = useAuth();
-  const { myName: profileName } = useProfile();
+  const { myName: profileName, budget } = useProfile();
   const [person, setPerson] = useState<'all' | 'me' | 'partner'>('all');
+  const [txType, setTxType] = useState<'expense' | 'income'>('expense');
+  const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
 
   const now = new Date();
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
@@ -97,10 +99,10 @@ export default function StatisticsScreen() {
 
   const monthlyExpenses = useMemo(() =>
     transactions.filter(tx =>
-      tx.type === 'expense' &&
+      tx.type === txType &&
       tx.date.startsWith(monthStr) &&
       (person === 'all' ? true : person === 'me' ? tx.person === myName : tx.person !== myName)
-    ), [transactions, monthStr, person, myName]);
+    ), [transactions, monthStr, person, myName, txType]);
 
   const cats = useMemo(() => {
     const map: Record<string, { label: string; amount: number; color: string; icon: string; iconColor: string; bgColor: string }> = {};
@@ -126,7 +128,7 @@ export default function StatisticsScreen() {
       const str = `${y}-${String(m).padStart(2, '0')}`;
       const total = transactions
         .filter(tx =>
-          tx.type === 'expense' &&
+          tx.type === txType &&
           tx.date.startsWith(str) &&
           (person === 'all' ? true : person === 'me' ? tx.person === myName : tx.person !== myName)
         )
@@ -134,7 +136,44 @@ export default function StatisticsScreen() {
       result.push({ year: y, month: m, total });
     }
     return result;
-  }, [transactions, currentYear, currentMonth, person, myName]);
+  }, [transactions, currentYear, currentMonth, person, myName, txType]);
+
+  // 연간 데이터 (12개월 전체)
+  const yearlyMonths = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1;
+      const str = `${currentYear}-${String(m).padStart(2, '0')}`;
+      const expense = transactions
+        .filter(tx => tx.type === 'expense' && tx.date.startsWith(str) &&
+          (person === 'all' ? true : person === 'me' ? tx.person === myName : tx.person !== myName))
+        .reduce((s, tx) => s + tx.amount, 0);
+      const income = transactions
+        .filter(tx => tx.type === 'income' && tx.date.startsWith(str) &&
+          (person === 'all' ? true : person === 'me' ? tx.person === myName : tx.person !== myName))
+        .reduce((s, tx) => s + tx.amount, 0);
+      return { month: m, expense, income };
+    });
+  }, [transactions, currentYear, person, myName]);
+
+  const yearlyTotals = useMemo(() => {
+    const totalExpense = yearlyMonths.reduce((s, m) => s + m.expense, 0);
+    const totalIncome = yearlyMonths.reduce((s, m) => s + m.income, 0);
+    return { totalExpense, totalIncome, net: totalIncome - totalExpense };
+  }, [yearlyMonths]);
+
+  // 연간 카테고리 top5
+  const yearlyCats = useMemo(() => {
+    const yearStr = String(currentYear);
+    const map: Record<string, { label: string; amount: number; color: string }> = {};
+    transactions
+      .filter(tx => tx.type === txType && tx.date.startsWith(yearStr) &&
+        (person === 'all' ? true : person === 'me' ? tx.person === myName : tx.person !== myName))
+      .forEach(tx => {
+        if (!map[tx.category]) map[tx.category] = { label: tx.category, amount: 0, color: tx.categoryIconColor };
+        map[tx.category].amount += tx.amount;
+      });
+    return Object.values(map).sort((a, b) => b.amount - a.amount).slice(0, 5);
+  }, [transactions, currentYear, txType, person, myName]);
 
   const openPicker = () => {
     setPickYearIdx(YEARS.indexOf(currentYear));
@@ -170,6 +209,135 @@ export default function StatisticsScreen() {
           </View>
         </View>
 
+        {/* 월간 / 연간 토글 */}
+        <View style={styles.viewModeToggle}>
+          {(['monthly', 'yearly'] as const).map(mode => (
+            <TouchableOpacity
+              key={mode}
+              style={[styles.viewModeBtn, viewMode === mode && styles.viewModeBtnActive]}
+              onPress={() => setViewMode(mode)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.viewModeBtnText, viewMode === mode && styles.viewModeBtnTextActive]}>
+                {mode === 'monthly' ? '월간' : '연간'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* 지출 / 수입 탭 */}
+        <View style={styles.txTypeToggle}>
+          {(['expense', 'income'] as const).map(t => (
+            <TouchableOpacity
+              key={t}
+              style={[styles.txTypeBtn, txType === t && (t === 'expense' ? styles.txTypeBtnExpense : styles.txTypeBtnIncome)]}
+              onPress={() => setTxType(t)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.txTypeBtnText, txType === t && styles.txTypeBtnTextActive]}>
+                {t === 'expense' ? '지출' : '수입'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── 연간 리포트 ── */}
+        {viewMode === 'yearly' && (() => {
+          const maxVal = Math.max(...yearlyMonths.map(m => Math.max(m.expense, m.income)), 1);
+          const BAR_MAX_H = 80;
+          return (
+            <>
+              {/* 연간 요약 카드 */}
+              <View style={styles.yearlySummary}>
+                {[
+                  { label: '총 수입', value: yearlyTotals.totalIncome, color: colors.primary },
+                  { label: '총 지출', value: yearlyTotals.totalExpense, color: '#E05C5C' },
+                  { label: '순이익', value: yearlyTotals.net, color: yearlyTotals.net >= 0 ? colors.primary : '#E05C5C' },
+                ].map(({ label, value, color }) => (
+                  <View key={label} style={styles.yearlySummaryItem}>
+                    <Text style={styles.yearlySummaryLbl}>{label}</Text>
+                    <Text style={[styles.yearlySummaryVal, { color }]} allowFontScaling={false}>
+                      {value < 0 ? '-' : ''}₩{Math.abs(value).toLocaleString()}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* 12개월 막대 차트 */}
+              <View style={styles.chartCard}>
+                <Text style={styles.chartLbl}>{currentYear}년 월별 추이</Text>
+                <View style={{ width: '100%', flexDirection: 'row' }}>
+                  {yearlyMonths.map(({ month, expense, income }) => {
+                    const val = txType === 'expense' ? expense : income;
+                    const barH = val > 0 ? Math.max(4, Math.round((val / maxVal) * BAR_MAX_H)) : 4;
+                    const isCurrent = month === currentMonth && currentYear === now.getFullYear();
+                    return (
+                      <View key={month} style={styles.barCol}>
+                        <View style={styles.barWrap}>
+                          <View style={[styles.bar, { height: barH, backgroundColor: isCurrent ? colors.primary : '#C5D9D0' }]} />
+                        </View>
+                        <Text style={[styles.barMonthText, isCurrent && styles.barMonthCurrent]}>{month}월</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* 연간 카테고리 top5 */}
+              <Text style={styles.catTitle}>{currentYear}년 카테고리별 {txType === 'expense' ? '지출' : '수입'} Top 5</Text>
+              {yearlyCats.length === 0 ? (
+                <View style={styles.emptyWrap}>
+                  <Ionicons name="bar-chart-outline" size={36} color={colors.border} />
+                  <Text style={styles.emptyText}>{currentYear}년 내역이 없어요</Text>
+                </View>
+              ) : (
+                <View style={styles.catCard}>
+                  {yearlyCats.map((cat, i) => (
+                    <React.Fragment key={cat.label}>
+                      {i > 0 && <View style={styles.catDivider} />}
+                      <View style={styles.catRow}>
+                        <Text style={styles.catRank}>{i + 1}</Text>
+                        <View style={[styles.catDot, { backgroundColor: cat.color }]} />
+                        <Text style={styles.catLabel}>{cat.label}</Text>
+                        <Text style={styles.catAmt} allowFontScaling={false}>
+                          <Text style={{ fontFamily: undefined }}>₩</Text>{cat.amount.toLocaleString()}
+                        </Text>
+                      </View>
+                    </React.Fragment>
+                  ))}
+                </View>
+              )}
+            </>
+          );
+        })()}
+
+        {/* ── 월간 콘텐츠 ── */}
+        {/* 예산 진행 바 (지출 탭 + 예산 설정된 경우) */}
+        {viewMode === 'monthly' && txType === 'expense' && budget > 0 && (() => {
+          const totalSpendAll = transactions
+            .filter(tx => tx.type === 'expense' && tx.date.startsWith(monthStr))
+            .reduce((s, tx) => s + tx.amount, 0);
+          const pct = Math.min(totalSpendAll / budget, 1);
+          const isOver = totalSpendAll > budget;
+          return (
+            <View style={styles.budgetCard}>
+              <View style={styles.budgetRow}>
+                <Text style={styles.budgetLbl}>이번 달 예산</Text>
+                <Text style={[styles.budgetPct, isOver && { color: '#E05C5C' }]}>
+                  {Math.round((totalSpendAll / budget) * 100)}%
+                </Text>
+              </View>
+              <View style={styles.budgetBarBg}>
+                <View style={[styles.budgetBarFill, { width: `${pct * 100}%` as any, backgroundColor: isOver ? '#E05C5C' : colors.primary }]} />
+              </View>
+              <View style={styles.budgetRow}>
+                <Text style={styles.budgetSub}>₩{totalSpendAll.toLocaleString()} 사용</Text>
+                <Text style={styles.budgetSub}>₩{budget.toLocaleString()} 예산</Text>
+              </View>
+            </View>
+          );
+        })()}
+
         {/* Person toggle */}
         <View style={styles.personToggle}>
           {([{ key: 'all' as const, label: '전체' }, { key: 'me' as const, label: myName }, { key: 'partner' as const, label: partnerName || '파트너' }]).map(({ key, label }) => (
@@ -185,54 +353,58 @@ export default function StatisticsScreen() {
           ))}
         </View>
 
-        {/* Chart card */}
-        <View style={styles.chartCard}>
-          <Text style={styles.chartLbl}>{chartType === 'donut' ? '이번 달 지출' : '월별 지출 추이'}</Text>
-          <View style={styles.chartToggle}>
-            {(['donut', 'bar'] as const).map(type => (
-              <TouchableOpacity
-                key={type}
-                testID={`stats-btn-chart-${type}`}
-                style={[styles.chartToggleBtn, chartType === type && styles.chartToggleBtnActive]}
-                onPress={() => setChartType(type)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.chartToggleText, chartType === type && styles.chartToggleTextActive]}>
-                  {type === 'donut' ? '도넛형' : '막대형'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {chartType === 'donut'
-            ? <DonutChart categories={cats} totalLabel="총 지출" totalAmt={`₩${totalSpend.toLocaleString()}`} />
-            : <BarChart data={sixMonths} currentYear={currentYear} currentMonth={currentMonth} />
-          }
-        </View>
+        {/* 월간 차트 + 카테고리 */}
+        {viewMode === 'monthly' && (
+          <>
+            <View style={styles.chartCard}>
+              <Text style={styles.chartLbl}>{chartType === 'donut' ? `이번 달 ${txType === 'expense' ? '지출' : '수입'}` : `월별 ${txType === 'expense' ? '지출' : '수입'} 추이`}</Text>
+              <View style={styles.chartToggle}>
+                {(['donut', 'bar'] as const).map(type => (
+                  <TouchableOpacity
+                    key={type}
+                    testID={`stats-btn-chart-${type}`}
+                    style={[styles.chartToggleBtn, chartType === type && styles.chartToggleBtnActive]}
+                    onPress={() => setChartType(type)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.chartToggleText, chartType === type && styles.chartToggleTextActive]}>
+                      {type === 'donut' ? '도넛형' : '막대형'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {chartType === 'donut'
+                ? <DonutChart categories={cats} totalLabel={txType === 'expense' ? '총 지출' : '총 수입'} totalAmt={`₩${totalSpend.toLocaleString()}`} />
+                : <BarChart data={sixMonths} currentYear={currentYear} currentMonth={currentMonth} />
+              }
+            </View>
 
-        {/* Category list */}
-        <Text style={styles.catTitle}>카테고리별 지출</Text>
-        {cats.length === 0 ? (
-          <View style={styles.emptyWrap}>
-            <Ionicons name="bar-chart-outline" size={36} color={colors.border} />
-            <Text style={styles.emptyText}>이번 달 지출 내역이 없어요</Text>
-          </View>
-        ) : (
-          <View style={styles.catCard}>
-            {cats.map((cat, i) => (
-              <React.Fragment key={cat.label}>
-                {i > 0 && <View style={styles.catDivider} />}
-                <View style={styles.catRow}>
-                  <View style={[styles.catDot, { backgroundColor: cat.color }]} />
-                  <Text style={styles.catLabel}>{cat.label}</Text>
-                  <Text style={styles.catPct}>{cat.pct}%</Text>
-                  <Text style={styles.catAmt} allowFontScaling={false}><Text style={{ fontFamily: undefined }}>₩</Text>{cat.amount.toLocaleString()}</Text>
-                </View>
-              </React.Fragment>
-            ))}
-          </View>
+            <Text style={styles.catTitle}>카테고리별 {txType === 'expense' ? '지출' : '수입'}</Text>
+            {cats.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Ionicons name="bar-chart-outline" size={36} color={colors.border} />
+                <Text style={styles.emptyText}>이번 달 {txType === 'expense' ? '지출' : '수입'} 내역이 없어요</Text>
+              </View>
+            ) : (
+              <View style={styles.catCard}>
+                {cats.map((cat, i) => (
+                  <React.Fragment key={cat.label}>
+                    {i > 0 && <View style={styles.catDivider} />}
+                    <View style={styles.catRow}>
+                      <View style={[styles.catDot, { backgroundColor: cat.color }]} />
+                      <Text style={styles.catLabel}>{cat.label}</Text>
+                      <Text style={styles.catPct}>{cat.pct}%</Text>
+                      <Text style={styles.catAmt} allowFontScaling={false}><Text style={{ fontFamily: undefined }}>₩</Text>{cat.amount.toLocaleString()}</Text>
+                    </View>
+                  </React.Fragment>
+                ))}
+              </View>
+            )}
+          </>
         )}
 
       </ScrollView>
+
 
       {/* 년도/월 선택 바텀시트 (AGs1J) */}
       <Modal visible={showPicker} animationType="slide" transparent onRequestClose={() => setShowPicker(false)}>
@@ -280,6 +452,34 @@ const styles = StyleSheet.create({
   headerMonth: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.text },
   monthBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.canvas },
   monthToggle: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+
+  viewModeToggle: { flexDirection: 'row', backgroundColor: colors.canvas, marginHorizontal: 20, borderRadius: 100, padding: 4, gap: 2, height: 40, marginBottom: 12 },
+  viewModeBtn: { flex: 1, borderRadius: 100, alignItems: 'center', justifyContent: 'center' },
+  viewModeBtnActive: { backgroundColor: colors.text },
+  viewModeBtnText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  viewModeBtnTextActive: { color: '#FFFFFF', fontFamily: fonts.semiBold },
+
+  yearlySummary: { flexDirection: 'row', marginHorizontal: 20, gap: 8, marginBottom: 12 },
+  yearlySummaryItem: { flex: 1, backgroundColor: colors.card, borderRadius: 14, padding: 14, alignItems: 'center', gap: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
+  yearlySummaryLbl: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  yearlySummaryVal: { fontFamily: fonts.bold, fontSize: 13, color: colors.text },
+
+  catRank: { fontFamily: fonts.bold, fontSize: 13, color: colors.textSecondary, width: 18, textAlign: 'center' },
+
+  txTypeToggle: { flexDirection: 'row', backgroundColor: colors.canvas, marginHorizontal: 20, borderRadius: 100, padding: 4, gap: 2, height: 40, marginBottom: 12 },
+  txTypeBtn: { flex: 1, borderRadius: 100, alignItems: 'center', justifyContent: 'center' },
+  txTypeBtnExpense: { backgroundColor: colors.secondary },
+  txTypeBtnIncome: { backgroundColor: colors.primary },
+  txTypeBtnText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  txTypeBtnTextActive: { color: '#FFFFFF', fontFamily: fonts.semiBold },
+
+  budgetCard: { backgroundColor: colors.card, marginHorizontal: 20, borderRadius: 16, padding: 16, marginBottom: 12, gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+  budgetRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  budgetLbl: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.text },
+  budgetPct: { fontFamily: fonts.bold, fontSize: 13, color: colors.primary },
+  budgetBarBg: { height: 8, backgroundColor: colors.canvas, borderRadius: 4, overflow: 'hidden' },
+  budgetBarFill: { height: '100%', borderRadius: 4 },
+  budgetSub: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
 
   personToggle: { flexDirection: 'row', backgroundColor: colors.canvas, marginHorizontal: 20, borderRadius: 100, padding: 4, gap: 2, height: 40, marginBottom: 16 },
   personBtn: { flex: 1, borderRadius: 100, alignItems: 'center', justifyContent: 'center' },

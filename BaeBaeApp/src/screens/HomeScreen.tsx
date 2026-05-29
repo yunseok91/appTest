@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
-  Modal, FlatList, TextInput, Image,
+  Modal, FlatList, TextInput, Image, Animated,
   Alert, ScrollView, Keyboard, TouchableWithoutFeedback,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
@@ -18,6 +18,7 @@ import {
   subscribeNotifications, markNotificationReadFS, markAllNotificationsReadFS,
   type AppNotification,
 } from '../services/firestoreService';
+import { extractAmountFromImage, GOOGLE_VISION_API_KEY } from '../services/ocrService';
 
 type TimeSlot = 'morning' | 'lunch' | 'evening';
 type TabType = 'expense' | 'income';
@@ -45,7 +46,7 @@ const TIME_LABEL: Record<TimeSlot, '아침' | '점심' | '저녁'> = {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
-  const { addTransaction, transactions } = useTransactions();
+  const { addTransaction, transactions, checkAndAddRecurring } = useTransactions();
   const { user, householdName, partnerName, partnerGender } = useAuth();
   const { budget, cards: profileCards, myName, myGender } = useProfile();
 
@@ -78,6 +79,7 @@ export default function HomeScreen() {
 
   const [payMethod, setPayMethod] = useState<PayMethod>('cash');
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [recurring, setRecurring] = useState<'monthly' | 'weekly' | null>(null);
 
   // 최초 1회 웰컴 팝업
   useEffect(() => {
@@ -85,6 +87,41 @@ export default function HomeScreen() {
       if (!val) setShowWelcome(true);
     });
   }, []);
+
+  // 예산 초과 알림 (80% / 100%)
+  useEffect(() => {
+    if (!hasBudget || budget === 0) return;
+    const pct = monthlyExpense / budget;
+    const key80 = `@budget_alert_80_${monthStr}`;
+    const key100 = `@budget_alert_100_${monthStr}`;
+    if (pct >= 1.0) {
+      AsyncStorage.getItem(key100).then(v => {
+        if (!v) {
+          Alert.alert('예산 초과!', `이번 달 예산 ₩${budget.toLocaleString()}을 초과했어요.`);
+          AsyncStorage.setItem(key100, '1');
+        }
+      });
+    } else if (pct >= 0.8) {
+      AsyncStorage.getItem(key80).then(v => {
+        if (!v) {
+          Alert.alert('예산 주의', `이번 달 예산의 80%를 사용했어요.\n남은 예산: ₩${(budget - monthlyExpense).toLocaleString()}`);
+          AsyncStorage.setItem(key80, '1');
+        }
+      });
+    }
+  }, [monthlyExpense, budget, hasBudget, monthStr]);
+
+  // 반복 거래 자동 등록 (transactions 로드 후 1회)
+  const hasCheckedRecurring = useRef(false);
+  useEffect(() => {
+    if (hasCheckedRecurring.current || transactions.length === 0) return;
+    hasCheckedRecurring.current = true;
+    checkAndAddRecurring().then(count => {
+      if (count > 0) {
+        Alert.alert('반복 거래', `${count}건의 반복 거래가 자동 등록되었습니다.`);
+      }
+    });
+  }, [transactions]);
 
   const handleCloseWelcome = async () => {
     await AsyncStorage.setItem('@baebae_welcome_shown', 'true');
@@ -99,6 +136,23 @@ export default function HomeScreen() {
     });
   }, [cards]);
 
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
+
+  // 파트너 알림 토스트
+  const [toastMsg, setToastMsg] = useState('');
+  const toastAnim = useRef(new Animated.Value(-80)).current;
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevUnreadCount = useRef(-1);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    Animated.spring(toastAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }).start();
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: -80, duration: 250, useNativeDriver: true }).start(() => setToastMsg(''));
+    }, 3500);
+  };
+
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCardPicker, setShowCardPicker] = useState(false);
@@ -110,7 +164,15 @@ export default function HomeScreen() {
   // Firestore 알림 구독
   useEffect(() => {
     if (!user?.id) return;
-    return subscribeNotifications(user.id, setNotifications);
+    return subscribeNotifications(user.id, (notifs) => {
+      setNotifications(notifs);
+      const unread = notifs.filter(n => !n.read);
+      if (prevUnreadCount.current !== -1 && unread.length > prevUnreadCount.current) {
+        const newest = notifs.find(n => !n.read);
+        if (newest) showToast(newest.message);
+      }
+      prevUnreadCount.current = unread.length;
+    });
   }, [user?.id]);
 
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -137,6 +199,7 @@ export default function HomeScreen() {
     return arr;
   })();
 
+  // 사진 첨부 — 갤러리에서 선택, OCR 없음
   const handlePickPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -154,9 +217,49 @@ export default function HomeScreen() {
     }
   };
 
+  // 영수증 촬영 — 카메라로 찍고 OCR 자동 실행
+  const handleScanReceipt = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('권한 필요', '카메라 접근 권한을 허용해 주세요.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+      setPhotoUri(uri);
+      if (!GOOGLE_VISION_API_KEY) {
+        Alert.alert('OCR 미설정', 'ocrService.ts에 GOOGLE_VISION_API_KEY를 입력해 주세요.');
+        return;
+      }
+      setIsOcrLoading(true);
+      const detected = await extractAmountFromImage(uri);
+      setIsOcrLoading(false);
+      if (detected) {
+        setAmount(String(detected));
+        showToast(`₩${detected.toLocaleString()} 금액을 자동 인식했어요`);
+      } else {
+        Alert.alert('인식 실패', '금액을 찾지 못했어요.\n영수증이 잘 보이도록 다시 촬영해 주세요.');
+      }
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} translucent={false} />
+
+      {/* 파트너 알림 토스트 */}
+      {toastMsg !== '' && (
+        <Animated.View style={[styles.toast, { top: insets.top + 8, transform: [{ translateY: toastAnim }] }]}>
+          <Ionicons name="notifications" size={15} color="#fff" />
+          <Text style={styles.toastText} numberOfLines={2}>{toastMsg}</Text>
+        </Animated.View>
+      )}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -433,16 +536,59 @@ export default function HomeScreen() {
               <Text style={styles.memoCount}>{memo.length}/50</Text>
             </View>
 
+            {/* 반복 설정 */}
+            <View style={styles.recurringRow}>
+              <Ionicons name="repeat-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.recurringLabel}>반복</Text>
+              {([['없음', null], ['매주', 'weekly'], ['매월', 'monthly']] as const).map(([label, val]) => (
+                <TouchableOpacity
+                  key={label}
+                  style={[styles.recurringChip, recurring === val && styles.recurringChipActive]}
+                  onPress={() => setRecurring(val)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.recurringChipText, recurring === val && styles.recurringChipTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             {/* 액션 버튼 */}
             <View style={styles.actionRow}>
+              {/* 영수증 촬영 버튼 */}
+              <TouchableOpacity
+                testID="home-btn-receipt"
+                style={[styles.photoBtn, isOcrLoading && { opacity: 0.5 }]}
+                onPress={handleScanReceipt}
+                disabled={isOcrLoading}
+                activeOpacity={0.8}
+              >
+                {isOcrLoading ? (
+                  <View style={styles.photoBtnInner}>
+                    <Ionicons name="scan-outline" size={16} color={colors.primary} />
+                    <View>
+                      <Text style={[styles.photoBtnText, { color: colors.primary }]}>인식 중...</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.photoBtnInner}>
+                    <Ionicons name="receipt-outline" size={16} color={colors.inactive} />
+                    <View>
+                      <Text style={styles.photoBtnText}>영수증 촬영</Text>
+                      <Text style={styles.photoBtnHint}>금액 자동 인식</Text>
+                    </View>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* 사진 첨부 버튼 */}
               <TouchableOpacity testID="home-btn-photo" style={styles.photoBtn} onPress={handlePickPhoto} activeOpacity={0.8}>
                 {photoUri ? (
                   <Image source={{ uri: photoUri }} style={styles.photoThumb} />
                 ) : (
-                  <>
+                  <View style={styles.photoBtnInner}>
                     <Ionicons name="camera-outline" size={16} color={colors.inactive} />
                     <Text style={styles.photoBtnText}>사진 첨부</Text>
-                  </>
+                  </View>
                 )}
               </TouchableOpacity>
               <TouchableOpacity
@@ -471,11 +617,13 @@ export default function HomeScreen() {
                       payMethod,
                       cardName: payMethod === 'card' ? selectedCard?.name : undefined,
                       photoUri: photoUri ?? undefined,
+                      recurring: recurring ?? null,
                     });
                     setAmount('');
                     setMemo('');
                     setPhotoUri(null);
                     setSelectedCategory(null);
+                    setRecurring(null);
                     Alert.alert('저장했습니다', '내역이 성공적으로 저장되었습니다.');
                   } catch (err: any) {
                     Alert.alert(
@@ -836,17 +984,33 @@ const styles = StyleSheet.create({
   // 액션 행
   actionRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   photoBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: colors.background, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 11,
+    paddingHorizontal: 14, paddingVertical: 10,
   },
+  photoBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   photoBtnText: { fontFamily: fonts.regular, fontSize: 13, color: colors.inactive },
+  photoBtnHint: { fontFamily: fonts.regular, fontSize: 10, color: colors.primary, marginTop: 1 },
   photoThumb: { width: 44, height: 44, borderRadius: 8 },
   saveBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     backgroundColor: colors.primary, borderRadius: 100, height: 46,
   },
   saveBtnText: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.white },
+
+  // OCR 버튼
+  ocrBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.primary },
+  ocrBtnText: { fontFamily: fonts.medium, fontSize: 12, color: colors.primary },
+
+  // 파트너 알림 토스트
+  toast: { position: 'absolute', left: 16, right: 16, zIndex: 999, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.text, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 12, elevation: 8 },
+  toastText: { flex: 1, fontFamily: fonts.regular, fontSize: 13, color: '#fff', lineHeight: 18 },
+
+  recurringRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  recurringLabel: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginRight: 4 },
+  recurringChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 100, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.border },
+  recurringChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  recurringChipText: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
+  recurringChipTextActive: { color: '#FFFFFF' },
 
   // 공통 시트
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },

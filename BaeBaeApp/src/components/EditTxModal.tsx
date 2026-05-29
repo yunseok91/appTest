@@ -35,6 +35,7 @@ export default function EditTxModal({ tx, onClose, onSave, cards = [] }: Props) 
   const [payMethod, setPayMethod] = useState<'cash' | 'card'>('cash');
   const [cardName, setCardName] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [recurringEdit, setRecurringEdit] = useState<'monthly' | 'weekly' | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function EditTxModal({ tx, onClose, onSave, cards = [] }: Props) 
       setPayMethod(tx.payMethod);
       setCardName(tx.cardName ?? '');
       setPhotoUri(tx.photoUri ?? null);
+      setRecurringEdit(tx.recurring ?? null);
     }
   }, [tx]);
 
@@ -91,6 +93,7 @@ export default function EditTxModal({ tx, onClose, onSave, cards = [] }: Props) 
         payMethod,
         cardName: payMethod === 'card' ? cardName || undefined : undefined,
         photoUri: photoUri ?? undefined,
+        recurring: recurringEdit,
       });
       onClose();
     } catch {
@@ -286,6 +289,27 @@ export default function EditTxModal({ tx, onClose, onSave, cards = [] }: Props) 
                     </View>
                   )}
                 </TouchableOpacity>
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* 반복 설정 */}
+              <View style={styles.section}>
+                <Text style={styles.label}>반복 설정</Text>
+                <View style={styles.chipRow}>
+                  {([['없음', null], ['매주', 'weekly'], ['매월', 'monthly']] as const).map(([label, val]) => (
+                    <TouchableOpacity
+                      key={label}
+                      style={[styles.timeChip, recurringEdit === val && styles.timeChipActive]}
+                      onPress={() => setRecurringEdit(val)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.timeChipText, recurringEdit === val && styles.timeChipTextActive]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </ScrollView>
 

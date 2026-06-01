@@ -57,7 +57,25 @@
           "iosUrlScheme": "com.googleusercontent.apps.476537137658-iko16ukbpt14to4ot4enkeotbrlrjbtn"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "BaeBaeWidget",
+              "label": "배배 가계부",
+              "minWidth": "180dp",
+              "minHeight": "120dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "description": "이번 달 지출을 홈 화면에서 확인하세요",
+              "previewImage": "@drawable/widget_preview",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ]
     ],
     "extra": {
       "eas": {

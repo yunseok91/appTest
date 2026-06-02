@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
   recurringManageBtn: { marginLeft: 'auto' as any, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100, borderWidth: 1, borderColor: colors.primary },
   recurringManageBtnText: { fontFamily: fonts.medium, fontSize: 11, color: colors.primary },
 
-  recurringSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  recurringSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '70%' },
   recurringSheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, paddingHorizontal: 20 },
   recurringSheetTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
   recurringEmpty: { alignItems: 'center', gap: 10, paddingVertical: 40 },
@@ -1127,7 +1127,7 @@ const styles = StyleSheet.create({
   recurringDeleteBtn: { padding: 4 },
 
   // 공통 시트
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {
     backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingHorizontal: 20, paddingTop: 12,

@@ -1090,7 +1090,7 @@ const styles = StyleSheet.create({
   photoBtnHint: { fontFamily: fonts.regular, fontSize: 10, color: colors.primary, marginTop: 1 },
   photoThumb: { width: 44, height: 44, borderRadius: 8 },
   saveBtn: {
-    width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     backgroundColor: colors.primary, borderRadius: 100, height: 46,
   },
   saveBtnText: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.white },

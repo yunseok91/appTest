@@ -1,6 +1,3 @@
-# GitHub Actions 워크플로우 — CI/CD
-# main 브랜치에 push 또는 PR 올릴 때 테스트 자동 실행
-# BaeBaeApp 코드 변경 시 테스트 통과 후 OTA 자동 배포
 name: CI/CD — Jest + Newman + EAS OTA
 
 on:
@@ -48,7 +45,6 @@ jobs:
     name: CI — Newman API 테스트
     runs-on: ubuntu-latest
     needs: test
-    continue-on-error: true              # Secret 미설정 시에도 배포 진행
 
     steps:
       - name: 코드 체크아웃
@@ -90,7 +86,7 @@ jobs:
   deploy:
     name: CD — OTA 배포
     runs-on: ubuntu-latest
-    needs: [test, newman]                # Jest + Newman 모두 통과해야 배포
+    needs: [test, newman]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:

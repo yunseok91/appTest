@@ -1084,6 +1084,7 @@ const styles = StyleSheet.create({
   photoBtn: {
     backgroundColor: colors.background, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 10,
+    justifyContent: 'center',
   },
   photoBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   photoBtnText: { fontFamily: fonts.regular, fontSize: 13, color: colors.inactive },

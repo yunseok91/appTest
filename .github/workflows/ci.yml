@@ -58,20 +58,14 @@ jobs:
       - name: Newman + HTML 리포터 설치
         run: npm install -g newman newman-reporter-htmlextra
 
-      - name: 환경변수 파일 생성 (Secrets → JSON 주입)
-        run: |
-          sed \
-            -e 's/{{FIREBASE_API_KEY}}/${{ secrets.FIREBASE_API_KEY }}/g' \
-            -e 's/{{FIREBASE_HOUSEHOLD_ID}}/${{ secrets.FIREBASE_HOUSEHOLD_ID }}/g' \
-            -e 's/{{FIREBASE_TEST_EMAIL}}/${{ secrets.FIREBASE_TEST_EMAIL }}/g' \
-            -e 's/{{FIREBASE_TEST_PASSWORD}}/${{ secrets.FIREBASE_TEST_PASSWORD }}/g' \
-            BaeBaeApp/docs/api-test/BaeBae-API.postman_environment.json \
-            > /tmp/env.json
-
       - name: Newman 실행
         run: |
           newman run BaeBaeApp/docs/api-test/BaeBae-API-Tests.postman_collection.json \
-            --environment /tmp/env.json \
+            --environment BaeBaeApp/docs/api-test/BaeBae-API.postman_environment.json \
+            --env-var "API_KEY=${{ secrets.FIREBASE_API_KEY }}" \
+            --env-var "HOUSEHOLD_ID=${{ secrets.FIREBASE_HOUSEHOLD_ID }}" \
+            --env-var "TEST_EMAIL=${{ secrets.FIREBASE_TEST_EMAIL }}" \
+            --env-var "TEST_PASSWORD=${{ secrets.FIREBASE_TEST_PASSWORD }}" \
             --reporters cli,htmlextra \
             --reporter-htmlextra-export BaeBaeApp/docs/api-test/newman-report.html \
             --bail

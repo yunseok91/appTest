@@ -166,7 +166,9 @@ export default function AppNavigator() {
     <Modal visible={forcedLogoutAlert} transparent animationType="fade">
       <View style={styles.alertDim}>
         <View style={styles.alertCard}>
-          <Text style={styles.alertEmoji}>🔒</Text>
+          <View style={styles.alertIconBg}>
+            <Ionicons name="lock-closed" size={32} color="#E05C5C" />
+          </View>
           <Text style={styles.alertTitle}>다른 기기에서 로그인</Text>
           <Text style={styles.alertSub}>다른 기기에서 로그인되어{'\n'}현재 기기에서 로그아웃됩니다.</Text>
           <TouchableOpacity
@@ -182,7 +184,9 @@ export default function AppNavigator() {
     <Modal visible={partnerDisconnectedAlert} transparent animationType="fade" onRequestClose={clearPartnerDisconnectedAlert}>
       <View style={styles.alertDim}>
         <View style={styles.alertCard}>
-          <Text style={styles.alertEmoji}>💔</Text>
+          <View style={styles.alertIconBg}>
+            <Ionicons name="heart-dislike-outline" size={32} color="#E05C5C" />
+          </View>
           <Text style={styles.alertTitle}>연결이 끊어졌어요</Text>
           <Text style={styles.alertSub}>상대방이 연결을 끊었습니다.</Text>
           <TouchableOpacity
@@ -198,7 +202,9 @@ export default function AppNavigator() {
     <Modal visible={partnerBudgetAlert} transparent animationType="fade" onRequestClose={clearPartnerBudgetAlert}>
       <View style={styles.alertDim}>
         <View style={styles.alertCard}>
-          <Text style={styles.alertEmoji}>💰</Text>
+          <View style={styles.alertIconBg}>
+            <Ionicons name="wallet-outline" size={32} color={colors.primary} />
+          </View>
           <Text style={styles.alertTitle}>예산이 설정됐어요</Text>
           <Text style={styles.alertSub}>파트너가 이번 달 예산을 설정했습니다.</Text>
           <TouchableOpacity style={styles.alertBtn} onPress={clearPartnerBudgetAlert} activeOpacity={0.85}>
@@ -213,7 +219,7 @@ export default function AppNavigator() {
           <View style={styles.alertIconBg}>
             <Ionicons name="checkmark-circle" size={32} color="#3D8A5A" />
           </View>
-          <Text style={styles.alertTitle}>연결 되었습니다! 🎉</Text>
+          <Text style={styles.alertTitle}>연결 되었습니다!</Text>
           <Text style={styles.alertSub}>{partnerName ? `${partnerName}님과 성공적으로 연결됐어요.` : '파트너와 성공적으로 연결됐어요.'}</Text>
           <Text style={styles.alertNotice}>예산 설정과 가계명이 초기화됩니다.</Text>
           <TouchableOpacity

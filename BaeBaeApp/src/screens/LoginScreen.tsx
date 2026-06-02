@@ -100,7 +100,7 @@ export default function LoginScreen() {
 
           {__DEV__ && (
             <TouchableOpacity testID="login-btn-dev-bypass" style={styles.devBtn} onPress={handleDevBypass}>
-              <Text style={styles.devBtnText}>🛠 개발 모드 진입</Text>
+              <Text style={styles.devBtnText}>개발 모드 진입</Text>
             </TouchableOpacity>
           )}
 

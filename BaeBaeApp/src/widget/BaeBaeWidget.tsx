@@ -40,8 +40,8 @@ export function BaeBaeWidget({ data }: { data: WidgetData }) {
       <FlexWidget style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
           <TextWidget
-            text="💑 "
-            style={{ fontSize: 13 }}
+            text="♥ "
+            style={{ fontSize: 13, color: PRIMARY }}
           />
           <TextWidget
             text={householdName || '배배'}

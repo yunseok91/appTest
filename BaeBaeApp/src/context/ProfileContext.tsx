@@ -12,6 +12,7 @@ const STORAGE_BUDGET  = '@profile_budget';
 const STORAGE_CARDS   = '@profile_cards';
 const STORAGE_NAME    = '@profile_myname';
 const STORAGE_GENDER  = '@profile_gender';
+const STORAGE_PHOTO   = '@profile_photo_uri';
 
 const CARD_COLORS = ['#0046B0', '#FFB300', '#3A1D96', '#00897B', '#E53935', '#6D4C41'];
 
@@ -27,6 +28,8 @@ type ProfileContextType = {
   myGender: 'male' | 'female';
   setMyName: (name: string) => Promise<void>;
   setMyGender: (gender: 'male' | 'female') => Promise<void>;
+  profilePhotoUri: string | null;
+  setProfilePhotoUri: (uri: string | null) => Promise<void>;
 };
 
 const ProfileContext = createContext<ProfileContextType>({
@@ -39,6 +42,8 @@ const ProfileContext = createContext<ProfileContextType>({
   myGender: 'male',
   setMyName: async () => {},
   setMyGender: async () => {},
+  profilePhotoUri: null,
+  setProfilePhotoUri: async () => {},
 });
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
@@ -50,6 +55,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [partnerCards, setPartnerCards] = useState<ProfileCard[]>([]);
   const [myName, setMyNameState] = useState('');
   const [myGender, setMyGenderState] = useState<'male' | 'female'>('male');
+  const [profilePhotoUri, setProfilePhotoUriState] = useState<string | null>(null);
 
   // myCards를 ref로도 관리 (클로저 stale 방지)
   const myCardsRef = useRef<ProfileCard[]>([]);
@@ -59,11 +65,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const [b, c, n, g] = await Promise.all([
+        const [b, c, n, g, p] = await Promise.all([
           AsyncStorage.getItem(STORAGE_BUDGET),
           AsyncStorage.getItem(STORAGE_CARDS),
           AsyncStorage.getItem(STORAGE_NAME),
           AsyncStorage.getItem(STORAGE_GENDER),
+          AsyncStorage.getItem(STORAGE_PHOTO),
         ]);
         if (b !== null) setBudgetState(Number(b));
         if (c !== null) {
@@ -73,6 +80,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         }
         if (n !== null) setMyNameState(n);
         if (g === 'male' || g === 'female') setMyGenderState(g);
+        if (p !== null) setProfilePhotoUriState(p);
       } catch {}
     })();
   }, []);
@@ -190,11 +198,20 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(STORAGE_GENDER, gender);
   }, []);
 
+  const setProfilePhotoUri = useCallback(async (uri: string | null) => {
+    setProfilePhotoUriState(uri);
+    if (uri) {
+      await AsyncStorage.setItem(STORAGE_PHOTO, uri);
+    } else {
+      await AsyncStorage.removeItem(STORAGE_PHOTO);
+    }
+  }, []);
+
   // 합쳐서 노출: 내 카드 + 파트너 카드
   const cards: ProfileCard[] = [...myCards, ...partnerCards];
 
   return (
-    <ProfileContext.Provider value={{ budget, setBudget, cards, addCard, deleteCard, myName, myGender, setMyName, setMyGender }}>
+    <ProfileContext.Provider value={{ budget, setBudget, cards, addCard, deleteCard, myName, myGender, setMyName, setMyGender, profilePhotoUri, setProfilePhotoUri }}>
       {children}
     </ProfileContext.Provider>
   );

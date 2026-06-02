@@ -26,7 +26,7 @@ import TxCommentSection from './TxCommentSection';
 
 type TimeSlot = '아침' | '점심' | '저녁';
 const TIME_SLOTS: TimeSlot[] = ['아침', '점심', '저녁'];
-const TIME_EMOJI: Record<TimeSlot, string> = { 아침: '🌅', 점심: '☀️', 저녁: '🌙' };
+const TIME_ICON: Record<TimeSlot, keyof typeof Ionicons.glyphMap> = { 아침: 'sunny-outline', 점심: 'sunny', 저녁: 'moon-outline' };
 
 export function getDateLabel(dateStr: string): string {
   const today = new Date();
@@ -111,9 +111,8 @@ export default function TxDetailPopup({
         </Text>
         {tx.time && (
           <View style={styles.timeChipSingle}>
-            <Text style={styles.timeChipSingleText}>
-              {TIME_EMOJI[tx.time as TimeSlot]} {tx.time}
-            </Text>
+            <Ionicons name={TIME_ICON[tx.time as TimeSlot]} size={12} color="#FFFFFF" />
+            <Text style={styles.timeChipSingleText}>{tx.time}</Text>
           </View>
         )}
       </View>

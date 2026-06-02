@@ -62,7 +62,8 @@ export default function CoupleIconScreen() {
         </View>
 
         <View style={styles.chip}>
-          <Text style={styles.chipText}>💑 연인</Text>
+          <Ionicons name="heart" size={12} color={colors.secondary} />
+          <Text style={styles.chipText}>연인</Text>
         </View>
 
         <View style={styles.iconGrid}>
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
   chip: {
     height: 32, paddingHorizontal: 16, borderRadius: 100,
     backgroundColor: colors.primary, alignSelf: 'flex-start',
-    alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
   },
   chipText: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.white },
   iconGrid: { flexDirection: 'row', justifyContent: 'center', gap: 32 },

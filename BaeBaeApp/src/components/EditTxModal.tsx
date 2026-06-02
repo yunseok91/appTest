@@ -14,7 +14,7 @@ import type { Transaction } from '../context/TransactionContext';
 const MEMO_MAX = 50;
 type TimeSlot = '아침' | '점심' | '저녁';
 const TIME_SLOTS: TimeSlot[] = ['아침', '점심', '저녁'];
-const TIME_EMOJI: Record<TimeSlot, string> = { 아침: '🌅', 점심: '☀️', 저녁: '🌙' };
+const TIME_ICON: Record<TimeSlot, keyof typeof Ionicons.glyphMap> = { 아침: 'sunny-outline', 점심: 'sunny', 저녁: 'moon-outline' };
 
 type Props = {
   tx: Transaction | null;
@@ -199,9 +199,10 @@ export default function EditTxModal({ tx, onClose, onSave, cards = [] }: Props) 
                       onPress={() => setTime(t)}
                       activeOpacity={0.8}
                     >
-                      <Text style={[styles.timeChipText, time === t && styles.timeChipTextActive]}>
-                        {TIME_EMOJI[t]} {t}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <Ionicons name={TIME_ICON[t]} size={13} color={time === t ? '#fff' : colors.text} />
+                        <Text style={[styles.timeChipText, time === t && styles.timeChipTextActive]}>{t}</Text>
+                      </View>
                     </TouchableOpacity>
                   ))}
                 </View>

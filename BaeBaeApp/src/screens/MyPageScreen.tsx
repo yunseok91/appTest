@@ -10,6 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useProfile } from '../context/ProfileContext';
@@ -57,7 +58,7 @@ export default function MyPageScreen() {
   // Android 하단 네비게이션바 높이 (edge-to-edge에서 insets.bottom이 0으로 오는 경우 대비)
   const sheetBottom = Platform.OS === 'android' ? Math.max(insets.bottom, 24) + 24 : Math.max(insets.bottom, 16) + 20;
   const navigation = useNavigation<Nav>();
-  const { budget, setBudget, cards, addCard, deleteCard, myName, myGender } = useProfile();
+  const { budget, setBudget, cards, addCard, deleteCard, myName, myGender, profilePhotoUri, setProfilePhotoUri } = useProfile();
   const { signOut, deleteAccount, disconnectPartner, householdId, partnerName, partnerGender, partnerSince } = useAuth();
   const { transactions } = useTransactions();
   const now = new Date();
@@ -128,6 +129,37 @@ export default function MyPageScreen() {
     setExporting(false);
   };
 
+  const handlePickProfilePhoto = async () => {
+    Alert.alert('프로필 사진', '사진을 선택해 주세요', [
+      {
+        text: '갤러리에서 선택',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('권한 필요', '사진 접근 권한을 허용해 주세요.'); return; }
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+          if (!result.canceled && result.assets[0]) await saveProfilePhoto(result.assets[0].uri);
+        },
+      },
+      {
+        text: '카메라로 촬영',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('권한 필요', '카메라 접근 권한을 허용해 주세요.'); return; }
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+          if (!result.canceled && result.assets[0]) await saveProfilePhoto(result.assets[0].uri);
+        },
+      },
+      ...(profilePhotoUri ? [{ text: '사진 삭제', style: 'destructive' as const, onPress: () => setProfilePhotoUri(null) }] : []),
+      { text: '취소', style: 'cancel' as const },
+    ]);
+  };
+
+  const saveProfilePhoto = async (uri: string) => {
+    const dest = `${FileSystem.documentDirectory}profile_photo.jpg`;
+    await FileSystem.copyAsync({ from: uri, to: dest });
+    await setProfilePhotoUri(dest);
+  };
+
   const CARD_MAX = 5;
 
   const handleAddCard = async () => {
@@ -190,15 +222,24 @@ export default function MyPageScreen() {
         {/* Couple card */}
         <View style={styles.coupleCard}>
           <View style={styles.avatarsRow}>
-            <View style={[styles.bigAv, { backgroundColor: myGender === 'female' ? '#f2d9e1' : '#cbdfee' }]}>
-              <Image
-                source={myGender === 'female'
-                  ? require('../../assets/avatars/HMHJX.png')
-                  : require('../../assets/avatars/aRbFP.png')}
-                style={styles.avImg}
-                resizeMode="contain"
-              />
-            </View>
+            <TouchableOpacity onPress={handlePickProfilePhoto} activeOpacity={0.85}>
+              <View style={[styles.bigAv, { backgroundColor: myGender === 'female' ? '#f2d9e1' : '#cbdfee' }]}>
+                {profilePhotoUri ? (
+                  <Image source={{ uri: profilePhotoUri }} style={[styles.avImg, { width: '100%', height: '100%', borderRadius: 999 }]} resizeMode="cover" />
+                ) : (
+                  <Image
+                    source={myGender === 'female'
+                      ? require('../../assets/avatars/HMHJX.png')
+                      : require('../../assets/avatars/aRbFP.png')}
+                    style={styles.avImg}
+                    resizeMode="contain"
+                  />
+                )}
+              </View>
+              <View style={styles.photoEditBadge}>
+                <Ionicons name="camera" size={11} color="#fff" />
+              </View>
+            </TouchableOpacity>
             <Ionicons name="heart" size={16} color={colors.secondary} />
             {partnerGender ? (
               <View style={[styles.bigAv, { backgroundColor: partnerGender === 'female' ? '#f2d9e1' : '#cbdfee' }]}>
@@ -569,8 +610,9 @@ const styles = StyleSheet.create({
     shadowColor: colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 2,
   },
   avatarsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bigAv: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  bigAv: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avImg: { width: 56, height: 56 },
+  photoEditBadge: { position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.card },
   coupleName: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, letterSpacing: -0.2 },
   coupleSub: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
 

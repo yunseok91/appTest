@@ -46,9 +46,9 @@ const TIME_LABEL: Record<TimeSlot, '아침' | '점심' | '저녁'> = {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
-  const { addTransaction, transactions, checkAndAddRecurring } = useTransactions();
+  const { addTransaction, updateTransaction, transactions, checkAndAddRecurring } = useTransactions();
   const { user, householdName, partnerName, partnerGender } = useAuth();
-  const { budget, cards: profileCards, myName, myGender } = useProfile();
+  const { budget, cards: profileCards, myName, myGender, profilePhotoUri } = useProfile();
 
   // Map profile cards to local Card type (memoized to avoid effect loop)
   const cards = useMemo<Card[]>(
@@ -80,6 +80,7 @@ export default function HomeScreen() {
   const [payMethod, setPayMethod] = useState<PayMethod>('cash');
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [recurring, setRecurring] = useState<'monthly' | 'weekly' | null>(null);
+  const [showRecurringManager, setShowRecurringManager] = useState(false);
 
   // 최초 1회 웰컴 팝업
   useEffect(() => {
@@ -277,7 +278,7 @@ export default function HomeScreen() {
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.relChip}>
-                <Text style={styles.relChipEmoji}>💑</Text>
+                <Ionicons name="heart" size={11} color={colors.secondary} />
                 <Text style={styles.relChipText}>연인</Text>
               </View>
               <Text style={styles.coupleName} allowFontScaling={false}>{householdName}</Text>
@@ -295,13 +296,17 @@ export default function HomeScreen() {
           {/* Avatar row */}
           <View style={styles.avatarRow}>
             <View style={[styles.avatarCircle, { backgroundColor: myGender === 'female' ? '#f2d9e1' : '#cbdfee' }]}>
-              <Image
-                source={myGender === 'female'
-                  ? require('../../assets/avatars/HMHJX.png')
-                  : require('../../assets/avatars/aRbFP.png')}
-                style={styles.avatarImg}
-                resizeMode="contain"
-              />
+              {profilePhotoUri ? (
+                <Image source={{ uri: profilePhotoUri }} style={{ width: 30, height: 30, borderRadius: 15 }} resizeMode="cover" />
+              ) : (
+                <Image
+                  source={myGender === 'female'
+                    ? require('../../assets/avatars/HMHJX.png')
+                    : require('../../assets/avatars/aRbFP.png')}
+                  style={styles.avatarImg}
+                  resizeMode="contain"
+                />
+              )}
             </View>
             <Text style={styles.avatarName}>{myName || '나'}</Text>
             <Ionicons name="heart" size={11} color={colors.secondary} />
@@ -550,14 +555,23 @@ export default function HomeScreen() {
                   <Text style={[styles.recurringChipText, recurring === val && styles.recurringChipTextActive]}>{label}</Text>
                 </TouchableOpacity>
               ))}
+              {transactions.some(tx => tx.recurring) && (
+                <TouchableOpacity
+                  style={styles.recurringManageBtn}
+                  onPress={() => setShowRecurringManager(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.recurringManageBtnText}>관리</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
-            {/* 액션 버튼 */}
-            <View style={styles.actionRow}>
+            {/* 사진 버튼 행 */}
+            <View style={styles.photoRow}>
               {/* 영수증 촬영 버튼 */}
               <TouchableOpacity
                 testID="home-btn-receipt"
-                style={[styles.photoBtn, isOcrLoading && { opacity: 0.5 }]}
+                style={[styles.photoBtn, { flex: 1 }, isOcrLoading && { opacity: 0.5 }]}
                 onPress={handleScanReceipt}
                 disabled={isOcrLoading}
                 activeOpacity={0.8}
@@ -565,9 +579,7 @@ export default function HomeScreen() {
                 {isOcrLoading ? (
                   <View style={styles.photoBtnInner}>
                     <Ionicons name="scan-outline" size={16} color={colors.primary} />
-                    <View>
-                      <Text style={[styles.photoBtnText, { color: colors.primary }]}>인식 중...</Text>
-                    </View>
+                    <Text style={[styles.photoBtnText, { color: colors.primary }]}>인식 중...</Text>
                   </View>
                 ) : (
                   <View style={styles.photoBtnInner}>
@@ -581,9 +593,17 @@ export default function HomeScreen() {
               </TouchableOpacity>
 
               {/* 사진 첨부 버튼 */}
-              <TouchableOpacity testID="home-btn-photo" style={styles.photoBtn} onPress={handlePickPhoto} activeOpacity={0.8}>
+              <TouchableOpacity
+                testID="home-btn-photo"
+                style={[styles.photoBtn, { flex: 1 }]}
+                onPress={handlePickPhoto}
+                activeOpacity={0.8}
+              >
                 {photoUri ? (
-                  <Image source={{ uri: photoUri }} style={styles.photoThumb} />
+                  <View style={styles.photoBtnInner}>
+                    <Image source={{ uri: photoUri }} style={styles.photoThumb} />
+                    <Text style={styles.photoBtnText} numberOfLines={1}>사진 선택됨</Text>
+                  </View>
                 ) : (
                   <View style={styles.photoBtnInner}>
                     <Ionicons name="camera-outline" size={16} color={colors.inactive} />
@@ -591,6 +611,10 @@ export default function HomeScreen() {
                   </View>
                 )}
               </TouchableOpacity>
+            </View>
+
+            {/* 저장하기 버튼 행 */}
+            <View style={styles.actionRow}>
               <TouchableOpacity
                 testID="btn-save"
                 style={[styles.saveBtn, (!amount || !selectedCategory) && { opacity: 0.4 }]}
@@ -638,19 +662,92 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
+
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
+      {/* 반복 거래 관리 바텀시트 */}
+      <Modal visible={showRecurringManager} transparent animationType="slide" onRequestClose={() => setShowRecurringManager(false)}>
+        <View style={styles.overlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowRecurringManager(false)} />
+          <View style={[styles.recurringSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.recurringSheetHeader}>
+              <Text style={styles.recurringSheetTitle}>반복 거래 관리</Text>
+              <TouchableOpacity onPress={() => setShowRecurringManager(false)}>
+                <Ionicons name="close" size={18} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />
+            {(() => {
+              const recurringTxs = transactions.filter(tx => tx.recurring);
+              if (recurringTxs.length === 0) {
+                return (
+                  <View style={styles.recurringEmpty}>
+                    <Ionicons name="repeat-outline" size={32} color={colors.border} />
+                    <Text style={styles.recurringEmptyText}>등록된 반복 거래가 없어요</Text>
+                  </View>
+                );
+              }
+              return (
+                <FlatList
+                  data={recurringTxs}
+                  keyExtractor={item => item.id}
+                  contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8 }}
+                  renderItem={({ item }) => (
+                    <View style={styles.recurringItem}>
+                      <View style={[styles.recurringItemIcon, { backgroundColor: item.categoryBgColor }]}>
+                        <Ionicons name={item.categoryIcon as any} size={16} color={item.categoryIconColor} />
+                      </View>
+                      <View style={styles.recurringItemInfo}>
+                        <Text style={styles.recurringItemCategory}>{item.category}</Text>
+                        <Text style={styles.recurringItemMeta}>
+                          {item.recurring === 'monthly' ? `매월 ${new Date(item.date).getDate()}일` : `매주 ${['일','월','화','수','목','금','토'][new Date(item.date).getDay()]}요일`}
+                          {item.memo ? `  ·  ${item.memo}` : ''}
+                        </Text>
+                      </View>
+                      <Text style={[styles.recurringItemAmt, { color: item.type === 'expense' ? colors.secondary : colors.primary }]} allowFontScaling={false}>
+                        {item.type === 'expense' ? '-' : '+'}₩{item.amount.toLocaleString()}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.recurringDeleteBtn}
+                        onPress={() => {
+                          Alert.alert(
+                            '반복 해제',
+                            `"${item.category}" 반복 거래를 해제할까요?\n(기존 내역은 유지됩니다)`,
+                            [
+                              { text: '취소', style: 'cancel' },
+                              {
+                                text: '해제',
+                                style: 'destructive',
+                                onPress: () => updateTransaction(item.id, { recurring: null }),
+                              },
+                            ],
+                          );
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="close-circle-outline" size={20} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                />
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+
       {/* 웰컴 팝업 — 최초 1회 */}
       <Modal visible={showWelcome} transparent animationType="fade" onRequestClose={handleCloseWelcome}>
         <View style={styles.welcomeOverlay}>
           <View style={styles.welcomeCard}>
-            <Text style={styles.welcomeEmoji}>🎉</Text>
+            <Ionicons name="sparkles" size={56} color={colors.primary} />
             <Text style={styles.welcomeTitle} allowFontScaling={false}>우리 가계부 시작!</Text>
             <Text style={styles.welcomeSub}>
-              {myName ? `${myName}의 첫 번째 날이에요\n` : ''}함께 기록을 시작해볼까요? 💑
+              {myName ? `${myName}의 첫 번째 날이에요\n` : ''}함께 기록을 시작해볼까요?
             </Text>
             <TouchableOpacity testID="home-btn-welcome-start" style={styles.welcomeBtn} onPress={handleCloseWelcome} activeOpacity={0.85}>
               <Text style={styles.welcomeBtnText}>시작하기</Text>
@@ -982,7 +1079,8 @@ const styles = StyleSheet.create({
   },
 
   // 액션 행
-  actionRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  photoRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  actionRow: {},
   photoBtn: {
     backgroundColor: colors.background, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 10,
@@ -992,7 +1090,7 @@ const styles = StyleSheet.create({
   photoBtnHint: { fontFamily: fonts.regular, fontSize: 10, color: colors.primary, marginTop: 1 },
   photoThumb: { width: 44, height: 44, borderRadius: 8 },
   saveBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     backgroundColor: colors.primary, borderRadius: 100, height: 46,
   },
   saveBtnText: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.white },
@@ -1011,6 +1109,21 @@ const styles = StyleSheet.create({
   recurringChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   recurringChipText: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
   recurringChipTextActive: { color: '#FFFFFF' },
+  recurringManageBtn: { marginLeft: 'auto' as any, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100, borderWidth: 1, borderColor: colors.primary },
+  recurringManageBtnText: { fontFamily: fonts.medium, fontSize: 11, color: colors.primary },
+
+  recurringSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  recurringSheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, paddingHorizontal: 20 },
+  recurringSheetTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
+  recurringEmpty: { alignItems: 'center', gap: 10, paddingVertical: 40 },
+  recurringEmptyText: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted },
+  recurringItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  recurringItemIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  recurringItemInfo: { flex: 1 },
+  recurringItemCategory: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.text },
+  recurringItemMeta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  recurringItemAmt: { fontFamily: fonts.semiBold, fontSize: 14 },
+  recurringDeleteBtn: { padding: 4 },
 
   // 공통 시트
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },

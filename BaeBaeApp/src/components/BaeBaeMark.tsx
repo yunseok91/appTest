@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function BaeBaeMark({ size = 114 }: { size?: number }) {
   const scale = size / 114;
@@ -15,7 +16,7 @@ export default function BaeBaeMark({ size = 114 }: { size?: number }) {
         {/* Right salmon circle (overlapping) */}
         <View style={[styles.circle, { width: 48 * scale, height: 48 * scale, borderRadius: 24 * scale, backgroundColor: '#D95F4B', left: 30 * scale }]}>
           <View style={[styles.inner, { width: 30 * scale, height: 30 * scale, borderRadius: 15 * scale, backgroundColor: '#FDF0ED' }]}>
-            <Text style={[styles.symbol, { color: '#D95F4B', fontSize: 14 * scale }]}>♡</Text>
+            <Ionicons name="heart-outline" size={14 * scale} color="#D95F4B" />
           </View>
         </View>
       </View>

@@ -70,7 +70,6 @@
               "targetCellWidth": 3,
               "targetCellHeight": 2,
               "description": "이번 달 지출을 홈 화면에서 확인하세요",
-              "previewImage": "@drawable/widget_preview",
               "updatePeriodMillis": 1800000
             }
           ]

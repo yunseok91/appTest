@@ -651,7 +651,7 @@ const styles = StyleSheet.create({
   },
 
   // Card add sheet
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheetKav: { flex: 1, justifyContent: 'flex-end' },
   cardSheet: {
     backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,

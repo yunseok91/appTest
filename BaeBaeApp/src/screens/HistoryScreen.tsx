@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
   payBadgeText: { fontFamily: fonts.semiBold, fontSize: 10 },
 
   // --- Detail sheet ---
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheetModalWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
   sheetPopup: { width: '100%', backgroundColor: colors.card, borderRadius: 24, overflow: 'hidden', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   viewOnlyText: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted },
 
   // --- Date picker bottom sheet ---
-  ymModalWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.3)' },
+  ymModalWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   ymSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   ymHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, paddingHorizontal: 20 },
   ymTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },

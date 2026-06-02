@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   personDot: { width: 6, height: 6, borderRadius: 3 },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
 
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
   editSaveBtnText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
 
   // Year/Month picker bottom sheet
-  ymModalWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.3)' },
+  ymModalWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   ymSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   ymHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 48, paddingHorizontal: 20 },
   ymTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },

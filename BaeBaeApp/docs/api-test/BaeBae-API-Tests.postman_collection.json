@@ -439,7 +439,7 @@
           ],
           "request": {
             "method": "GET",
-            "url": "{{BASE_URL}}/users/pNZfFCdKziWAPvRBZDLd7PzeZ3v1",
+            "url": "{{BASE_URL}}/users/{{USER_ID}}",
             "header": [{ "key": "Authorization", "value": "Bearer {{ID_TOKEN}}" }]
           }
         }

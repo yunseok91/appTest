@@ -307,6 +307,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const pd = partnerDoc.data();
             setPartnerName(pd.name || '파트너');
             setPartnerGender(pd.gender ?? null);
+            AsyncStorage.setItem('@profile_partnername', pd.name || '파트너').catch(() => {});
           }
         } catch {}
 
@@ -328,6 +329,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setPartnerName(null);
         setPartnerGender(null);
+        AsyncStorage.setItem('@profile_partnername', '').catch(() => {});
         setPartnerId(null);
         // 첫 스냅샷이 아닌데 파트너가 없어진 경우 → 파트너가 나간 것
         if (!isFirstSnapshot && prevMemberCountRef.current > 1) {

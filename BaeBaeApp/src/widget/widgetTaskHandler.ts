@@ -1,12 +1,13 @@
 import React from 'react';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BaeBaeWidget } from './BaeBaeWidget';
+import { BaeBaeCalendarWidget, CalendarWidgetData } from './BaeBaeWidget';
 
 type Transaction = {
   type: 'expense' | 'income';
   amount: number;
   date: string;
+  createdBy?: string;
 };
 
 export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
@@ -18,37 +19,63 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
     action === 'WIDGET_RESIZED'
   ) {
     const now = new Date();
-    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const monthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const today = now.getDate();
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    const firstDay = new Date(year, month - 1, 1).getDay();
+    const daysInMonth = new Date(year, month, 0).getDate();
 
-    const [txStr, budgetStr, nameStr] = await Promise.all([
+    const [txStr, myNameStr, partnerNameStr, myUidStr] = await Promise.all([
       AsyncStorage.getItem('@baebae_transactions'),
-      AsyncStorage.getItem('@profile_budget'),
       AsyncStorage.getItem('@profile_myname'),
+      AsyncStorage.getItem('@profile_partnername'),
+      AsyncStorage.getItem('@baebae_last_uid'),
     ]);
 
     const transactions: Transaction[] = txStr ? JSON.parse(txStr) : [];
-    const budget = budgetStr ? Number(budgetStr) : 0;
-    const myName = nameStr ?? '';
+    const myUid = myUidStr ?? '';
+    const monthTxs = transactions.filter(tx => tx.date.startsWith(monthStr));
 
-    const monthlyExpense = transactions
-      .filter(tx => tx.type === 'expense' && tx.date.startsWith(monthStr))
+    const days: CalendarWidgetData['days'] = {};
+    for (const tx of monthTxs) {
+      const dayNum = parseInt(tx.date.split('-')[2], 10);
+      if (!days[dayNum]) {
+        days[dayNum] = { myExpense: false, myIncome: false, partnerExpense: false, partnerIncome: false };
+      }
+      const isMine = !myUid || tx.createdBy === myUid;
+      if (isMine) {
+        if (tx.type === 'expense') days[dayNum].myExpense = true;
+        else days[dayNum].myIncome = true;
+      } else {
+        if (tx.type === 'expense') days[dayNum].partnerExpense = true;
+        else days[dayNum].partnerIncome = true;
+      }
+    }
+
+    const myMonthlyExpense = monthTxs
+      .filter(tx => tx.type === 'expense' && (!myUid || tx.createdBy === myUid))
       .reduce((s, tx) => s + tx.amount, 0);
 
-    const monthlyIncome = transactions
-      .filter(tx => tx.type === 'income' && tx.date.startsWith(monthStr))
+    const partnerMonthlyExpense = monthTxs
+      .filter(tx => tx.type === 'expense' && !!myUid && tx.createdBy !== myUid)
       .reduce((s, tx) => s + tx.amount, 0);
+
+    const data: CalendarWidgetData = {
+      year,
+      month,
+      firstDay,
+      daysInMonth,
+      today,
+      days,
+      myName: myNameStr || '나',
+      partnerName: partnerNameStr || '파트너',
+      myMonthlyExpense,
+      partnerMonthlyExpense,
+    };
 
     props.renderWidget(
-      React.createElement(BaeBaeWidget, {
-        data: {
-          monthlyExpense,
-          monthlyIncome,
-          budget,
-          monthLabel,
-          householdName: myName || '배배',
-        },
-      }),
+      React.createElement(BaeBaeCalendarWidget, { data }),
     );
   }
 }

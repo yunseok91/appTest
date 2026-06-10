@@ -58,13 +58,13 @@ function DateCell({ day, isToday, data, isSun, isSat }: {
   return (
     <FlexWidget style={{ flex: 1, width: 0, flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
       {day == null ? null : isToday ? (
-        <FlexWidget style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' }}>
-          <TextWidget text={String(day)} style={{ fontSize: 11, fontWeight: 'bold', color: '#FFFFFF' }} />
+        <FlexWidget style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' }}>
+          <TextWidget text={String(day)} style={{ fontSize: 12, fontWeight: 'bold', color: '#FFFFFF' }} />
         </FlexWidget>
       ) : (
         <TextWidget
           text={String(day)}
-          style={{ fontSize: 11, fontWeight: '500', color: isSun ? TEXT_SUN : isSat ? TEXT_SAT : TEXT_MAIN }}
+          style={{ fontSize: 12, fontWeight: '400', color: isSun ? TEXT_SUN : isSat ? TEXT_SAT : TEXT_MAIN }}
         />
       )}
       <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', height: 7 }}>

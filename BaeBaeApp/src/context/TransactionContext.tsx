@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
+import { triggerWidgetUpdate } from '../widget/triggerWidgetUpdate';
 import {
   addTransactionFS,
   updateTransactionFS,
@@ -125,6 +126,8 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     unsubscribeRef.current?.();
     unsubscribeRef.current = subscribeTransactions(householdId, (txs) => {
       setTransactions(txs);
+      AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(txs)).catch(() => {});
+      triggerWidgetUpdate().catch(() => {});
     });
 
     return () => {
@@ -137,6 +140,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
   const saveLocal = async (list: Transaction[]) => {
     setTransactions(list);
     await AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(list));
+    triggerWidgetUpdate().catch(() => {});
   };
 
   // ── CRUD ──

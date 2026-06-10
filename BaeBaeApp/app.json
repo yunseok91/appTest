@@ -66,9 +66,12 @@
               "name": "BaeBaeWidget",
               "label": "배배 가계부",
               "minWidth": "180dp",
-              "minHeight": "120dp",
-              "targetCellWidth": 3,
-              "targetCellHeight": 2,
+              "minHeight": "200dp",
+              "minResizeWidth": "180dp",
+              "minResizeHeight": "200dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 5,
+              "resizeMode": "both",
               "description": "이번 달 지출을 홈 화면에서 확인하세요",
               "updatePeriodMillis": 1800000
             }

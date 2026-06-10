@@ -101,10 +101,8 @@ export function BaeBaeCalendarWidget({ data }: { data: CalendarWidgetData }) {
       clickAction="OPEN_APP"
     >
       {/* 헤더 */}
-      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: HDR_BG, borderRadius: 16, paddingLeft: 14, paddingRight: 14, height: 44 }}>
-        <FlexWidget style={{ flex: 1 }}>
-          <TextWidget text={`${month}월 ${year}`} style={{ fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' }} />
-        </FlexWidget>
+      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: HDR_BG, paddingLeft: 14, paddingRight: 14, height: 44 }}>
+        <TextWidget text={`${month}월 ${year}`} style={{ fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' }} />
       </FlexWidget>
 
       {/* 요일 */}
@@ -135,7 +133,7 @@ export function BaeBaeCalendarWidget({ data }: { data: CalendarWidgetData }) {
       </FlexWidget>
 
       {/* 하단 요약 */}
-      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: FOOTER_BG, borderRadius: 16, paddingLeft: 12, paddingRight: 12, height: 42 }}>
+      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: FOOTER_BG, paddingLeft: 12, paddingRight: 12, height: 42 }}>
         <FlexWidget style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: ME_COLOR }} />
         <FlexWidget style={{ width: 5 }} />
         <TextWidget text={myName || '나'} style={{ fontSize: 10, color: TEXT_MUTED }} />

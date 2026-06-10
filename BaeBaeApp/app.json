@@ -71,7 +71,7 @@
               "minResizeHeight": "200dp",
               "targetCellWidth": 4,
               "targetCellHeight": 5,
-              "resizeMode": "both",
+              "resizeMode": "horizontal|vertical",
               "description": "이번 달 지출을 홈 화면에서 확인하세요",
               "updatePeriodMillis": 1800000
             }

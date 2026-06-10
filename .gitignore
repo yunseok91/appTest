@@ -1,6 +1,9 @@
 # Pencil MCP auto-generated images
 images/
 
+# Claude Code 설정
+.claude/settings.json
+
 # Allure 테스트 결과 (로컬 생성 파일)
 e2e/allure-results/
 

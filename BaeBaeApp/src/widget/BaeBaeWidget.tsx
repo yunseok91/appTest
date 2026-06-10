@@ -56,7 +56,7 @@ function DateCell({ day, isToday, data, isSun, isSat }: {
   const hasDots = !!data && (data.myExpense || data.myIncome || data.partnerExpense || data.partnerIncome);
 
   return (
-    <FlexWidget style={{ flex: 1, flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+    <FlexWidget style={{ flex: 1, width: 0, flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
       {day == null ? null : isToday ? (
         <FlexWidget style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' }}>
           <TextWidget text={String(day)} style={{ fontSize: 11, fontWeight: 'bold', color: '#FFFFFF' }} />
@@ -97,27 +97,27 @@ export function BaeBaeCalendarWidget({ data }: { data: CalendarWidgetData }) {
 
   return (
     <FlexWidget
-      style={{ flex: 1, flexDirection: 'column', backgroundColor: FOOTER_BG, borderRadius: 20 }}
+      style={{ width: 'match_parent', height: 'match_parent', flexDirection: 'column', backgroundColor: FOOTER_BG, borderRadius: 20 }}
       clickAction="OPEN_APP"
     >
       {/* 헤더 */}
-      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: HDR_BG, paddingLeft: 14, paddingRight: 14, height: 44 }}>
+      <FlexWidget style={{ width: 'match_parent', height: 44, flexDirection: 'row', alignItems: 'center', backgroundColor: HDR_BG, paddingLeft: 14, paddingRight: 14 }}>
         <TextWidget text={`${month}월 ${year}`} style={{ fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' }} />
       </FlexWidget>
 
       {/* 요일 */}
-      <FlexWidget style={{ flexDirection: 'row', backgroundColor: DAY_BG, height: 26, alignItems: 'center', paddingLeft: 4, paddingRight: 4 }}>
+      <FlexWidget style={{ width: 'match_parent', height: 26, flexDirection: 'row', backgroundColor: DAY_BG, alignItems: 'center', paddingLeft: 4, paddingRight: 4 }}>
         {DAY_LABELS.map((d, i) => (
-          <FlexWidget key={i} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <FlexWidget key={i} style={{ flex: 1, width: 0, justifyContent: 'center', alignItems: 'center' }}>
             <TextWidget text={d} style={{ fontSize: 9, fontWeight: '600', color: DAY_COLORS[i] }} />
           </FlexWidget>
         ))}
       </FlexWidget>
 
       {/* 캘린더 그리드 */}
-      <FlexWidget style={{ flex: 1, flexDirection: 'column', backgroundColor: CARD_BG, paddingLeft: 2, paddingRight: 2, paddingTop: 2, paddingBottom: 2 }}>
+      <FlexWidget style={{ width: 'match_parent', height: 0, flex: 1, flexDirection: 'column', backgroundColor: CARD_BG, paddingLeft: 2, paddingRight: 2, paddingTop: 2, paddingBottom: 2 }}>
         {weeks.map((week, wi) => (
-          <FlexWidget key={wi} style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+          <FlexWidget key={wi} style={{ width: 'match_parent', height: 0, flex: 1, flexDirection: 'row', alignItems: 'center' }}>
             {week.map((day, di) => (
               <DateCell
                 key={di}
@@ -133,17 +133,17 @@ export function BaeBaeCalendarWidget({ data }: { data: CalendarWidgetData }) {
       </FlexWidget>
 
       {/* 하단 요약 */}
-      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: FOOTER_BG, paddingLeft: 12, paddingRight: 12, height: 42 }}>
+      <FlexWidget style={{ width: 'match_parent', height: 42, flexDirection: 'row', alignItems: 'center', backgroundColor: FOOTER_BG, paddingLeft: 12, paddingRight: 12 }}>
         <FlexWidget style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: ME_COLOR }} />
         <FlexWidget style={{ width: 5 }} />
         <TextWidget text={myName || '나'} style={{ fontSize: 10, color: TEXT_MUTED }} />
-        <FlexWidget style={{ flex: 1 }} />
+        <FlexWidget style={{ flex: 1, width: 0 }} />
         <TextWidget text={`-₩${myMonthlyExpense.toLocaleString('ko-KR')}`} style={{ fontSize: 11, fontWeight: 'bold', color: ME_COLOR }} />
         <FlexWidget style={{ width: 12 }} />
         <FlexWidget style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: PTR_COLOR }} />
         <FlexWidget style={{ width: 5 }} />
         <TextWidget text={partnerName || '파트너'} style={{ fontSize: 10, color: TEXT_MUTED }} />
-        <FlexWidget style={{ flex: 1 }} />
+        <FlexWidget style={{ flex: 1, width: 0 }} />
         <TextWidget text={`-₩${partnerMonthlyExpense.toLocaleString('ko-KR')}`} style={{ fontSize: 11, fontWeight: 'bold', color: PTR_COLOR }} />
       </FlexWidget>
     </FlexWidget>

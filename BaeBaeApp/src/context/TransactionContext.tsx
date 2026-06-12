@@ -124,9 +124,9 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
 
     // 실시간 구독 시작
     unsubscribeRef.current?.();
-    unsubscribeRef.current = subscribeTransactions(householdId, (txs) => {
+    unsubscribeRef.current = subscribeTransactions(householdId, async (txs) => {
       setTransactions(txs);
-      AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(txs)).catch(() => {});
+      try { await AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(txs)); } catch {}
       triggerWidgetUpdate().catch(() => {});
     });
 
